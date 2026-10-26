@@ -1,20 +1,19 @@
-import type { Friend } from '../types';
 import { PrototypeBanner } from './PrototypeBanner';
 
 interface RouteScreenProps {
-  friend: Friend;
+  displayName: string;
   onBack: () => void;
 }
 
 // Screen structure only. Pedestrian routing, ETA, and step estimates
 // are computed by the walking engine in Phase 3 — nothing here is live data.
-export function RouteScreen({ friend, onBack }: RouteScreenProps) {
+export function RouteScreen({ displayName, onBack }: RouteScreenProps) {
   return (
     <section className="screen" aria-label="Walking route">
       <PrototypeBanner />
       <header className="sub-header">
         <button type="button" className="back-link" onClick={onBack}>
-          ← {friend.name}
+          ← {displayName}
         </button>
         <h1>Walking route</h1>
       </header>

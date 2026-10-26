@@ -64,6 +64,7 @@ Checks:
 npm run typecheck
 npm run build
 npm run test
+npm run db:seed    # Metro Manila demo dataset (idempotent)
 ```
 
 ## Proposed four-screen Messenger experience
@@ -79,12 +80,49 @@ This sequence illustrates the proposed feature's user journey. **In Phase 1, the
 
 When implemented, Nearby discovery should return only eligible, opted-in friends within the chosen radius. Selecting a friend must trigger a fresh permission check before revealing an authorized walking route. Neither simulated locations nor demo friend records should be represented as data retrieved from Facebook.
 
+## Phase 2 — Proximity discovery (implemented)
+
+The radar is live: real PostGIS `ST_DWithin` queries over a deterministic Metro Manila demo dataset (all identities and coordinates simulated). Friend dots are positioned from computed distance and bearing, and the radius selector (500 m / 1 km / 2 km / 5 km) changes discovery results.
+
+### Demo data
+
+```powershell
+npm run db:seed   # idempotent; safe to re-run, never deletes data
+```
+
+The seed creates demo user `you` near Rizal Park plus friends covering every eligibility case: in and out of range, disabled, stale, beyond 5 km, non-friend, and pending. Expected discovery: 500 m → Coleen; 1 km → + Alex; 2 km → + Sam; 5 km → + Rhea.
+
+### API endpoints
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /friends/nearby?radius_m=1000` | Eligible nearby friends with distance and bearing |
+| `GET /near-circle/visibility` | Activation state |
+| `PUT /near-circle/visibility` | Enable/disable (+ optional radius) |
+| `POST /near-circle/toggle` | Enable/disable alias |
+| `PUT /location` | Move the demo user (simulated) |
+| `GET /friends` | Approved friends with Near-Circle/location status |
+| `GET /friends/:id` | Permitted detail; proximity only when discoverable |
+
+The demo context is the local user `you`; no authentication system is introduced.
+
+### Demonstration
+
+1. Run `npm run db:seed` and open http://localhost:5173/.
+2. Open Near-Circle → the radar shows Coleen at ~280 m.
+3. Switch the radius to 5 km → Alex, Sam, and Rhea appear.
+4. Select a dot → detail with the real distance; **View walking route** leads to the Phase 3 stub (no fabricated routes).
+5. Toggle Near-Circle off → the radar pauses discovery.
+
+Live-database integration tests: `$env:RUN_INTEGRATION_TESTS='1'; npm --workspace apps/api run test:integration`.
+
 ## Project structure
 
 ```text
 apps/web/          # React + Vite + TS prototype UI (mock data in src/mockData.ts)
-apps/api/          # Fastify API: GET /health, GET /demo/friends
+apps/api/          # Fastify API: health, demo friends, nearby/visibility/location/friends (PostGIS)
 db/init/           # PostGIS extension + foundation schema
+db/seed/           # Idempotent Metro Manila demo dataset (npm run db:seed)
 routing/           # OSRM service boundary: README + data/ for the Phase 3 graph
 scripts/           # startall.ps1 / stopall.ps1 / status.ps1 (+ common.ps1)
 docker-compose.yml # Four project-owned services
@@ -107,7 +145,7 @@ See [`.env.example`](./.env.example). Ports, credentials, routing endpoints, and
 | Phase | Scope | Current status |
 |---|---|---|
 | **1 — Foundation** | Mock Messenger UI, API skeleton, PostGIS infrastructure, OSRM service boundary, unified launcher | In progress / verify against tests |
-| **2 — Proximity discovery** | Real PostGIS radius queries, friend eligibility, and radar positioning | Planned |
+| **2 — Proximity discovery** | Real PostGIS radius queries, friend eligibility, and radar positioning | Implemented |
 | **3 — Walking routes** | Dedicated pedestrian OSRM graph, street-map overlay, ETA, and step estimation | Planned |
 | **4 — API validation** | Strict schemas, permission enforcement, location freshness, security and lifecycle tests | Planned |
 | **5 — Meta AI** | Real Meta Model API-powered meetup assistance | Planned |

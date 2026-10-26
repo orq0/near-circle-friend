@@ -26,6 +26,7 @@ services:
       - "${API_PORT:-3001}:3001"
     environment:
       API_PORT: "3001"
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-near_circle}:${POSTGRES_PASSWORD:-near_circle_dev_password}@near-circle-db:5432/${POSTGRES_DB:-near_circle}"
       ROUTING_PROVIDER: "${ROUTING_PROVIDER:-osrm}"
       ROUTING_WALK_URL: "${ROUTING_WALK_URL:-http://near-circle-routing-walk:5000}"
       MAP_TILE_URL: "${MAP_TILE_URL:-https://tile.openstreetmap.org/{z}/{x}/{y}.png}"

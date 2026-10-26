@@ -1,22 +1,32 @@
-import type { Friend } from '../types';
+import type { NearbyFriend, RadarStatus } from '../types';
 import { CURRENT_USER } from '../mockData';
+import { RADII_M, formatDistance, positionOnRadar } from '../radar';
 import { PrototypeBanner } from './PrototypeBanner';
+import { RadiusSelector } from './RadiusSelector';
 
-// Phase 1 preview layout. Positions are illustrative placeholders:
-// real dot placement from PostGIS distance + bearing arrives in Phase 2.
-const PREVIEW_SPOTS = [
-  { left: '64%', top: '30%' },
-  { left: '30%', top: '58%' },
-  { left: '66%', top: '68%' },
-] as const;
+const RING_FRACTIONS = [0.25, 0.5, 0.75] as const;
 
 interface RadarScreenProps {
-  friends: Friend[];
-  onSelectFriend: (friend: Friend) => void;
+  status: RadarStatus;
+  friends: NearbyFriend[];
+  radiusM: number;
+  onRadiusChange: (meters: number) => void;
+  onSelectFriend: (friend: NearbyFriend) => void;
+  onRetry: () => void;
+  onEnable: () => void;
   onBack: () => void;
 }
 
-export function RadarScreen({ friends, onSelectFriend, onBack }: RadarScreenProps) {
+export function RadarScreen({
+  status,
+  friends,
+  radiusM,
+  onRadiusChange,
+  onSelectFriend,
+  onRetry,
+  onEnable,
+  onBack,
+}: RadarScreenProps) {
   return (
     <section className="screen" aria-label="Near-Circle radar">
       <PrototypeBanner />
@@ -26,38 +36,84 @@ export function RadarScreen({ friends, onSelectFriend, onBack }: RadarScreenProp
         </button>
         <h1>Near-Circle radar</h1>
       </header>
+      <RadiusSelector
+        value={radiusM}
+        options={RADII_M}
+        disabled={status === 'loading'}
+        onChange={onRadiusChange}
+      />
       <div className="radar-wrap">
-        <div className="radar" role="group" aria-label="Nearby friends radar preview">
-          <span className="ring ring-1" aria-hidden="true" />
-          <span className="ring ring-2" aria-hidden="true" />
+        <div className="radar" role="group" aria-label="Nearby friends radar">
+          {RING_FRACTIONS.map((fraction) => (
+            <span
+              key={fraction}
+              className="ring"
+              style={{ inset: `${(1 - fraction) * 50}%` }}
+              aria-hidden="true"
+            />
+          ))}
           <span className="sweep" aria-hidden="true" />
           <span className="you-dot" title="You are at the center">
             {CURRENT_USER.initial}
             <span className="you-label">YOU</span>
           </span>
-          {friends.map((friend, index) => {
-            const spot = PREVIEW_SPOTS[index % PREVIEW_SPOTS.length];
-            return (
-              <button
-                key={friend.id}
-                type="button"
-                className="friend-dot"
-                style={{ left: spot.left, top: spot.top }}
-                aria-label={`Select ${friend.name}`}
-                title={friend.name}
-                onClick={() => onSelectFriend(friend)}
-              >
-                {friend.initial}
-              </button>
-            );
-          })}
+          {status === 'ready' &&
+            friends.map((friend) => {
+              const point = positionOnRadar(friend.distance_m, friend.bearing_deg, radiusM);
+              return (
+                <button
+                  key={friend.id}
+                  type="button"
+                  className="friend-dot"
+                  style={{ left: `${point.xPct}%`, top: `${point.yPct}%` }}
+                  aria-label={`Select ${friend.display_name}`}
+                  title={`${friend.display_name} — ${formatDistance(friend.distance_m)}`}
+                  onClick={() => onSelectFriend(friend)}
+                >
+                  {friend.display_name.charAt(0)}
+                </button>
+              );
+            })}
         </div>
       </div>
+      {status === 'loading' && (
+        <p className="radar-state" role="status">
+          Scanning for nearby friends…
+        </p>
+      )}
+      {status === 'ready' && (
+        <p className="radar-state" role="status">
+          {friends.length === 1
+            ? '1 friend within '
+            : `${friends.length} friends within `}
+          {formatDistance(radiusM)}.
+        </p>
+      )}
+      {status === 'empty' && (
+        <p className="radar-state" role="status">
+          No friends within {formatDistance(radiusM)} — try a larger radius.
+        </p>
+      )}
+      {status === 'error' && (
+        <div className="radar-alert">
+          <p role="alert">Could not load nearby friends.</p>
+          <button type="button" className="retry-btn" onClick={onRetry}>
+            Retry
+          </button>
+        </div>
+      )}
+      {status === 'disabled' && (
+        <div className="radar-alert">
+          <p>Near-Circle is off — discovery is paused.</p>
+          <button type="button" className="retry-btn" onClick={onEnable}>
+            Turn on Near-Circle
+          </button>
+        </div>
+      )}
       <p className="radar-rule">
-        Radar rule: you stay centered; only eligible, opted-in friends appear,
-        positioned by distance and bearing.
+        Dots show real PostGIS distance and bearing around Metro Manila demo
+        locations. Simulated identities; genuine proximity math.
       </p>
-      <p className="phase-note">Preview layout — live positions arrive in Phase 2.</p>
     </section>
   );
 }

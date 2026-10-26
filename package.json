@@ -13,6 +13,7 @@
     "status": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/status.ps1",
     "dev:api": "npm --workspace apps/api run dev",
     "dev:web": "npm --workspace apps/web run dev",
+    "db:seed": "npm --workspace apps/api run db:seed",
     "build": "npm --workspace apps/api run build && npm --workspace apps/web run build",
     "test": "npm --workspace apps/api run test && npm --workspace apps/web run test",
     "typecheck": "npm --workspace apps/api run typecheck && npm --workspace apps/web run typecheck"

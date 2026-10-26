@@ -6,25 +6,42 @@ const AVATAR_HUES: Record<string, number> = {
   sam: 32,
 };
 
-export function ConversationItem({ friend }: { friend: Friend }) {
+interface ConversationItemProps {
+  friend: Friend;
+  selected: boolean;
+  nearCircleOn: boolean | null;
+  onSelect: (friend: Friend) => void;
+}
+
+export function ConversationItem({ friend, selected, nearCircleOn, onSelect }: ConversationItemProps) {
   const hue = AVATAR_HUES[friend.id] ?? 220;
   return (
-    <li className="convo">
-      <span
-        className="avatar"
-        aria-hidden="true"
-        style={{ backgroundColor: `hsl(${hue} 55% 88%)`, color: `hsl(${hue} 60% 28%)` }}
+    <li className={selected ? 'convo selected' : 'convo'}>
+      <button
+        type="button"
+        className="convo-btn"
+        aria-current={selected ? 'true' : undefined}
+        onClick={() => onSelect(friend)}
       >
-        {friend.initial}
-        {friend.status === 'online' && <span className="presence-dot" />}
-      </span>
-      <span className="convo-body">
-        <span className="convo-top">
-          <span className="convo-name">{friend.name}</span>
-          <span className={`status status-${friend.status}`}>{friend.statusLabel}</span>
+        <span
+          className="avatar"
+          aria-hidden="true"
+          style={{ backgroundColor: `hsl(${hue} 55% 88%)`, color: `hsl(${hue} 60% 28%)` }}
+        >
+          {friend.initial}
+          {friend.status === 'online' && <span className="presence-dot" />}
         </span>
-        <span className="convo-preview">{friend.preview}</span>
-      </span>
+        <span className="convo-body">
+          <span className="convo-top">
+            <span className="convo-name">{friend.name}</span>
+            <span className={`status status-${friend.status}`}>{friend.statusLabel}</span>
+          </span>
+          <span className="convo-preview">{friend.preview}</span>
+        </span>
+        {nearCircleOn === true && (
+          <span className="nc-dot" title="Near-Circle enabled" aria-label={`${friend.name} has Near-Circle enabled`} />
+        )}
+      </button>
     </li>
   );
 }
