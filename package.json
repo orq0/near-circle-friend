@@ -1,0 +1,23 @@
+{
+  "name": "near-circle",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Near-Circle: opt-in friend proximity radar + walking routes (Meta Global AI Hackathon)",
+  "workspaces": [
+    "apps/web",
+    "apps/api"
+  ],
+  "scripts": {
+    "startall": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/startall.ps1",
+    "stopall": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/stopall.ps1",
+    "status": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/status.ps1",
+    "dev:api": "npm --workspace apps/api run dev",
+    "dev:web": "npm --workspace apps/web run dev",
+    "build": "npm --workspace apps/api run build && npm --workspace apps/web run build",
+    "test": "npm --workspace apps/api run test && npm --workspace apps/web run test",
+    "typecheck": "npm --workspace apps/api run typecheck && npm --workspace apps/web run typecheck"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

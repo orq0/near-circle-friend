@@ -1,0 +1,81 @@
+# Near-Circle local development stack — four project-owned services.
+# The OSM-compatible map tile provider is external by design (see MAP_TILE_URL)
+# and is intentionally NOT a fifth container here.
+name: near-circle
+
+services:
+  near-circle-web:
+    container_name: near-circle-web
+    build:
+      context: ./apps/web
+    ports:
+      - "${WEB_PORT:-5173}:5173"
+    environment:
+      VITE_API_URL: ""
+    depends_on:
+      near-circle-api:
+        condition: service_started
+    networks:
+      - near-circle-net
+
+  near-circle-api:
+    container_name: near-circle-api
+    build:
+      context: ./apps/api
+    ports:
+      - "${API_PORT:-3001}:3001"
+    environment:
+      API_PORT: "3001"
+      ROUTING_PROVIDER: "${ROUTING_PROVIDER:-osrm}"
+      ROUTING_WALK_URL: "${ROUTING_WALK_URL:-http://near-circle-routing-walk:5000}"
+      MAP_TILE_URL: "${MAP_TILE_URL:-https://tile.openstreetmap.org/{z}/{x}/{y}.png}"
+      MAP_TILE_ATTRIBUTION: "${MAP_TILE_ATTRIBUTION:-© OpenStreetMap contributors}"
+      DEFAULT_STRIDE_M: "${DEFAULT_STRIDE_M:-0.75}"
+    depends_on:
+      near-circle-db:
+        condition: service_healthy
+    networks:
+      - near-circle-net
+
+  near-circle-db:
+    container_name: near-circle-db
+    image: postgis/postgis:16-3.4
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    environment:
+      POSTGRES_USER: "${POSTGRES_USER:-near_circle}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-near_circle_dev_password}"
+      POSTGRES_DB: "${POSTGRES_DB:-near_circle}"
+    volumes:
+      - near-circle-db-data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-near_circle} -d ${POSTGRES_DB:-near_circle}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks:
+      - near-circle-net
+
+  # Independent pedestrian routing API. Phase 1: scaffold only — no foot-profile
+  # graph exists yet, so this container exits until the Phase 3 bootstrap prepares
+  # routing/data/near-circle.osrm. See routing/README.md. restart is deliberately
+  # "no" so an unprepared graph shows as stopped, never as a fake-healthy router.
+  near-circle-routing-walk:
+    container_name: near-circle-routing-walk
+    image: osrm/osrm-backend:v5.27.1
+    command: ["osrm-routed", "--algorithm", "mld", "/data/near-circle.osrm"]
+    ports:
+      - "${ROUTING_WALK_PORT:-5001}:5000"
+    volumes:
+      - ./routing/data:/data:ro
+    restart: "no"
+    networks:
+      - near-circle-net
+
+volumes:
+  near-circle-db-data:
+
+networks:
+  near-circle-net:
+    driver: bridge
