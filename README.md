@@ -1,4 +1,4 @@
-# Near-Circle
+# Near-Circle-Friend
 
 **Proposed Facebook Messenger Feature | Meta Global AI Hackathon | Phase 1**
 
