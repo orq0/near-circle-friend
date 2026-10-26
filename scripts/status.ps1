@@ -16,7 +16,9 @@ if (-not (Test-ComposeAvailable)) {
     $dockerNote = 'docker unavailable'
 } else {
     try {
-        $raw = & docker compose -f $composeFile ps --format json 2>$null
+        # Include the `routing` profile so a prepared router (Phase 3) shows up;
+        # harmless while the profile is inactive.
+        $raw = & docker compose -f $composeFile --profile routing ps --format json 2>$null
         if (-not [string]::IsNullOrWhiteSpace($raw)) {
             $list = @($raw | ConvertFrom-Json)
             foreach ($c in $list) {

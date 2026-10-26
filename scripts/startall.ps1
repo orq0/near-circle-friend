@@ -26,8 +26,18 @@ if (-not (Test-ComposeAvailable)) {
 }
 
 Write-Host ''
+# The router sits behind the `routing` profile until its pedestrian graph is
+# prepared (Phase 3). Enable the profile only when the graph artifact exists,
+# so plain Phase 1 startup never pulls or requires OSRM.
+$graphFile = Join-Path $repoRoot 'routing/data/near-circle.osrm'
+$upArgs = @('compose', '-f', $composeFile, 'up', '-d')
+if (Test-Path $graphFile) {
+    $upArgs = @('compose', '-f', $composeFile, '--profile', 'routing', 'up', '-d')
+    Write-Host 'Pedestrian graph detected: enabling the routing profile.' -ForegroundColor DarkGray
+}
+
 Write-Host 'Starting Near-Circle services (docker compose up -d)...' -ForegroundColor Cyan
-& docker compose -f $composeFile up -d
+& docker @upArgs
 if ($LASTEXITCODE -ne 0) {
     Write-Host 'ERROR: docker compose up failed. See output above.' -ForegroundColor Red
     exit 1
@@ -70,7 +80,6 @@ if (Wait-HttpOk -Url $webUrl -TimeoutSec 120) {
 }
 
 # ---- Routing: scaffolded in Phase 1; honest not-ready until a foot graph exists ----
-$graphFile = Join-Path $repoRoot 'routing/data/near-circle.osrm'
 if (-not (Test-Path $graphFile)) {
     Write-NcStatus 'near-circle-routing-walk' 'not-ready' 'no pedestrian graph yet (Phase 3 bootstrap; see routing/README.md)'
 } else {

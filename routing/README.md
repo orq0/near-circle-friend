@@ -24,7 +24,7 @@ Graph preparation is an explicit, one-time bootstrap task, never part of
 1. Download a suitably licensed OpenStreetMap extract into `routing/data/`.
 2. Extract a pedestrian graph: `osrm-extract -p foot.lua near-circle.osm.pbf`.
 3. Partition and customize: `osrm-partition` + `osrm-customize`.
-4. Start only the router: `docker compose up -d near-circle-routing-walk`.
+4. Start only the router: `docker compose --profile routing up -d near-circle-routing-walk`.
 5. Validate on a known pedestrian-only path before claiming walking ETAs.
 
 ## Direct API test (once a graph exists)

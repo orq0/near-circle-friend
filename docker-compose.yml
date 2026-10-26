@@ -57,13 +57,15 @@ services:
     networks:
       - near-circle-net
 
-  # Independent pedestrian routing API. Phase 1: scaffold only — no foot-profile
-  # graph exists yet, so this container exits until the Phase 3 bootstrap prepares
-  # routing/data/near-circle.osrm. See routing/README.md. restart is deliberately
-  # "no" so an unprepared graph shows as stopped, never as a fake-healthy router.
+  # Independent pedestrian routing API. Gated behind the `routing` Compose
+  # profile: plain `up` skips it while no foot-profile graph exists (Phase 1).
+  # Once the Phase 3 bootstrap prepares routing/data/near-circle.osrm, startall
+  # enables the profile automatically. See routing/README.md. restart is "no"
+  # so an unprepared graph shows as stopped, never as a fake-healthy router.
   near-circle-routing-walk:
     container_name: near-circle-routing-walk
-    image: osrm/osrm-backend:v5.27.1
+    image: ghcr.io/project-osrm/osrm-backend:v5.27.1
+    profiles: ["routing"]
     command: ["osrm-routed", "--algorithm", "mld", "/data/near-circle.osrm"]
     ports:
       - "${ROUTING_WALK_PORT:-5001}:5000"

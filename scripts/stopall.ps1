@@ -19,6 +19,8 @@ if (-not (Test-ComposeAvailable)) {
 }
 
 # Scoped to this Compose project only; unrelated containers are never touched.
+# Plain `down` also removes profile-started containers, and without `-v` all
+# volumes and graph artifacts are preserved.
 & docker compose -f $composeFile down
 if ($LASTEXITCODE -ne 0) {
     Write-Host 'ERROR: docker compose down failed. See output above.' -ForegroundColor Red
