@@ -1,0 +1,58 @@
+# Near-Circle — Fix Frontend Discovery Regression
+
+The application now renders the updated Messenger-style interface, but two critical Phase 2 features are broken.
+
+Observed in the browser:
+
+1. The inbox remains stuck displaying "Loading Near-Circle status…" instead of the Near-Circle activation/location control.
+2. The radar displays "Could not load nearby friends" and shows no friend markers.
+3. The interface displays "API connected", but discovery functionality is not working.
+
+These issues persist after the previous frontend proxy correction in commit `40164dd`.
+
+## Required investigation
+
+Trace the complete browser → Vite proxy → Fastify API → PostgreSQL/PostGIS request flow.
+
+Compare direct API responses with browser-proxied responses for:
+
+- `GET /api/near-circle/visibility`
+- `GET /api/friends/nearby?radius_m=1000`
+
+Inspect the actual endpoint paths, response bodies, status codes, API configuration, and frontend error handling.
+
+Determine why visibility initialization fails and why proximity discovery cannot retrieve friends.
+
+Verify that the API-connected indicator reflects only what it actually checks.
+
+## Requirements
+
+- Restore the Near-Circle activation/location control.
+- Restore radar discovery and red-dot friend markers.
+- Preserve the existing simulated Metro Manila friend dataset.
+- Preserve real PostGIS proximity filtering.
+- Preserve working OSRM pedestrian routing.
+- Ensure deactivating and reactivating Near-Circle works.
+- Handle API failures without leaving the interface indefinitely loading.
+- Add regression tests for both failures.
+- Do not substitute hardcoded friends for database results.
+
+## Verification
+
+Reproduce the problem before changing code.
+
+After fixing it, verify the actual running browser-to-API behavior, not only unit tests or TypeScript compilation.
+
+If browser or Docker access is restricted, report the limitation and provide precise PowerShell or DevTools checks for the operator to execute.
+
+Do not claim the issue is resolved without appropriate evidence.
+
+## Restrictions
+
+No elevated permissions, destructive Docker operations, GitHub pushes, graph regeneration, or modifications to unrelated repositories.
+
+Preserve existing work. Commit fixes locally only.
+
+Do not start another development phase.
+
+Report the confirmed root cause, changes, test results, and remaining verification steps.
