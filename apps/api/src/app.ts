@@ -10,12 +10,18 @@ import { friendsRoutes } from './routes/friends.js';
 import { routeRoutes } from './routes/route.js';
 import { createOsrmProvider } from './routing/osrmProvider.js';
 import { type WalkingRoutingProvider } from './routing/types.js';
+import { aiCircleRoutes } from './routes/aiCircle.js';
+import { createMetaModelProvider, type CircleModelProvider } from './ai/metaModelProvider.js';
+import { readAiCircleConfig, type AiCircleConfig } from './ai/types.js';
 
 export interface AppOptions {
   // Injected query backend for tests; defaults to the shared pg pool.
   db?: Queryable;
   // Injected routing provider for tests; defaults to the OSRM adapter.
   routing?: WalkingRoutingProvider;
+  // AI Circle Intelligence dependencies for tests; provider defaults to the
+  // Meta Model API adapter (inactive without MODEL_API_KEY).
+  ai?: { provider?: CircleModelProvider; config?: AiCircleConfig };
 }
 
 function errorStatus(err: unknown): number {
@@ -42,6 +48,9 @@ export async function buildApp(opts: AppOptions = {}): Promise<FastifyInstance> 
     createOsrmProvider({
       baseUrl: process.env['ROUTING_WALK_URL'] ?? 'http://near-circle-routing-walk:5000',
     });
+  const aiConfig = opts.ai?.config ?? readAiCircleConfig();
+  const aiProvider =
+    opts.ai?.provider ?? createMetaModelProvider({ config: aiConfig });
 
   app.setErrorHandler((err, _req, reply) => {
     if (err instanceof ApiError) {
@@ -59,6 +68,9 @@ export async function buildApp(opts: AppOptions = {}): Promise<FastifyInstance> 
   await app.register(async (instance) => locationRoutes(instance, db));
   await app.register(async (instance) => friendsRoutes(instance, db));
   await app.register(async (instance) => routeRoutes(instance, db, routing));
+  await app.register(async (instance) =>
+    aiCircleRoutes(instance, db, { routing, provider: aiProvider, config: aiConfig }),
+  );
 
   if (opts.db === undefined) {
     app.addHook('onClose', async () => {
