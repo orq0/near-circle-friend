@@ -11,7 +11,7 @@
 --   500 m  -> coleen
 --   1000 m -> coleen, alex
 --   2000 m -> coleen, alex, sam
---   5000 m -> coleen, alex, sam, nicole, rhea (nicole via reconnect-demo.sql)
+--   5000 m -> coleen, alex, sam, rhea
 -- marco is disabled, liza is stale, jose is beyond 5 km, nina is not a
 -- friend, and paolo's friendship is still pending: none of them may appear.
 

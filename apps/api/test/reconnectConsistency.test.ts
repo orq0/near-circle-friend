@@ -3,24 +3,30 @@ import { buildApp } from '../src/app.js';
 import { DEFAULT_AI_CIRCLE_CONFIG } from '../src/ai/types.js';
 import { createAiFakeDb, createCountingProvider } from './aiHelpers.js';
 
-// Debug-9 consistency suite: Radar, Nearby detail, and Reconnect Today must
+// Debug-9/10 consistency suite: Radar, Nearby detail, and Reconnect Today must
 // agree on who is eligible at the selected radius. Fixtures mirror the
-// Metro Manila seed (phase2-demo.sql + ai-demo.sql + reconnect-demo.sql).
+// Metro Manila seed (phase2-demo.sql + ai-demo.sql); Nicole was removed in
+// debug-10 and must not reappear here. Coleen (280 m) must be a candidate at
+// every one of the four radar distances: 500, 1000, 2000, 5000.
 const CONFIG = { ...DEFAULT_AI_CIRCLE_CONFIG, apiKey: 'test-key' };
 
-const NEARBY_5KM = [
-  { id: 'coleen', display_name: 'Coleen', distance_m: 280.1, bearing_deg: 45.0 },
-  { id: 'alex', display_name: 'Alex', distance_m: 750.3, bearing_deg: 170.0 },
-  { id: 'sam', display_name: 'Sam', distance_m: 1500.3, bearing_deg: 270.0 },
-  { id: 'nicole', display_name: 'Nicole', distance_m: 2476.4, bearing_deg: 195.4 },
-  { id: 'rhea', display_name: 'Rhea', distance_m: 3201.3, bearing_deg: 10.0 },
-];
+const COLEEN_NEARBY = { id: 'coleen', display_name: 'Coleen', distance_m: 280.1, bearing_deg: 45.0 };
+const ALEX_NEARBY = { id: 'alex', display_name: 'Alex', distance_m: 750.3, bearing_deg: 170.0 };
+const SAM_NEARBY = { id: 'sam', display_name: 'Sam', distance_m: 1500.3, bearing_deg: 270.0 };
+const RHEA_NEARBY = { id: 'rhea', display_name: 'Rhea', distance_m: 3201.3, bearing_deg: 10.0 };
 
-const APPROVED_5KM: Record<string, string> = {
+// Seed-documented discovery sets per radar distance.
+const NEARBY_BY_RADIUS: Record<number, Array<Record<string, unknown>>> = {
+  500: [COLEEN_NEARBY],
+  1000: [COLEEN_NEARBY, ALEX_NEARBY],
+  2000: [COLEEN_NEARBY, ALEX_NEARBY, SAM_NEARBY],
+  5000: [COLEEN_NEARBY, ALEX_NEARBY, SAM_NEARBY, RHEA_NEARBY],
+};
+
+const APPROVED: Record<string, string> = {
   'you:coleen': 'approved',
   'you:alex': 'approved',
   'you:sam': 'approved',
-  'you:nicole': 'approved',
   'you:rhea': 'approved',
 };
 
@@ -42,11 +48,10 @@ function profile(level: number | null, trend: string): Record<string, unknown> {
   };
 }
 
-const PROFILES_5KM: Record<string, Record<string, unknown>> = {
+const PROFILES: Record<string, Record<string, unknown>> = {
   'you:coleen': profile(5, 'stable'),
   'you:alex': profile(4, 'stable'),
   'you:sam': profile(null, 'unknown'),
-  'you:nicole': profile(4, 'decreasing'),
   'you:rhea': profile(3, 'stable'),
 };
 
@@ -64,15 +69,19 @@ function candidateIds(body: Record<string, unknown>): string[] {
   return (body['candidates'] as Array<Record<string, unknown>>).map((c) => c['id'] as string);
 }
 
-describe('debug-9 radar / nearby / reconnect consistency', () => {
+function nearbyIds(body: Record<string, unknown>): string[] {
+  return (body['friends'] as Array<Record<string, unknown>>).map((f) => f['id'] as string);
+}
+
+describe('debug-9/10 radar / nearby / reconnect consistency', () => {
   it('lists Rhea on the radar at the 5 km radius', async () => {
-    const db = createAiFakeDb({ relationships: APPROVED_5KM, nearby: NEARBY_5KM });
+    const db = createAiFakeDb({ relationships: APPROVED, nearby: NEARBY_BY_RADIUS[5000] });
     const app = await buildApp({ db, ai: { provider: createCountingProvider(), config: CONFIG } });
     try {
       const { status, body } = await json(app, 'GET', '/friends/nearby?radius_m=5000');
       expect(status).toBe(200);
+      expect(nearbyIds(body)).toEqual(['coleen', 'alex', 'sam', 'rhea']);
       const friends = body['friends'] as Array<Record<string, unknown>>;
-      expect(friends.map((f) => f['id'])).toEqual(['coleen', 'alex', 'sam', 'nicole', 'rhea']);
       expect(friends.find((f) => f['id'] === 'rhea')?.['distance_m']).toBe(3201.3);
     } finally {
       await app.close();
@@ -81,9 +90,9 @@ describe('debug-9 radar / nearby / reconnect consistency', () => {
 
   it('returns the same eligible set from nearby and opportunities with equivalent filters', async () => {
     const db = createAiFakeDb({
-      relationships: APPROVED_5KM,
-      nearby: NEARBY_5KM,
-      profiles: PROFILES_5KM,
+      relationships: APPROVED,
+      nearby: NEARBY_BY_RADIUS[5000],
+      profiles: PROFILES,
     });
     const provider = createCountingProvider();
     const app = await buildApp({ db, ai: { provider, config: CONFIG } });
@@ -92,8 +101,7 @@ describe('debug-9 radar / nearby / reconnect consistency', () => {
       const oppRes = await json(app, 'GET', '/ai-circle/opportunities?radius_m=5000');
       expect(nearbyRes.status).toBe(200);
       expect(oppRes.status).toBe(200);
-      const nearbyIds = (nearbyRes.body['friends'] as Array<Record<string, unknown>>).map((f) => f['id']);
-      expect(candidateIds(oppRes.body)).toEqual(nearbyIds);
+      expect(candidateIds(oppRes.body)).toEqual(nearbyIds(nearbyRes.body));
       expect(provider.calls.assess).toHaveLength(0);
       expect(provider.calls.advise).toHaveLength(0);
     } finally {
@@ -103,9 +111,9 @@ describe('debug-9 radar / nearby / reconnect consistency', () => {
 
   it('includes eligible Rhea in Reconnect Today with her stored closeness', async () => {
     const db = createAiFakeDb({
-      relationships: APPROVED_5KM,
-      nearby: NEARBY_5KM,
-      profiles: PROFILES_5KM,
+      relationships: APPROVED,
+      nearby: NEARBY_BY_RADIUS[5000],
+      profiles: PROFILES,
     });
     const provider = createCountingProvider();
     const app = await buildApp({ db, ai: { provider, config: CONFIG } });
@@ -125,40 +133,70 @@ describe('debug-9 radar / nearby / reconnect consistency', () => {
     }
   });
 
-  it('includes eligible Nicole in Reconnect Today with her stored closeness', async () => {
-    const db = createAiFakeDb({
-      relationships: APPROVED_5KM,
-      nearby: NEARBY_5KM,
-      profiles: PROFILES_5KM,
-    });
+  it('includes Coleen in Reconnect Today at all four radar distances', async () => {
+    for (const radius of [500, 1000, 2000, 5000]) {
+      const db = createAiFakeDb({
+        relationships: APPROVED,
+        nearby: NEARBY_BY_RADIUS[radius] ?? [],
+        profiles: PROFILES,
+      });
+      const provider = createCountingProvider();
+      const app = await buildApp({ db, ai: { provider, config: CONFIG } });
+      try {
+        const { status, body } = await json(app, 'GET', `/ai-circle/opportunities?radius_m=${radius}`);
+        expect(status).toBe(200);
+        expect(body['radius_m']).toBe(radius);
+        const candidates = body['candidates'] as Array<Record<string, unknown>>;
+        const coleen = candidates.find((c) => c['id'] === 'coleen');
+        expect(coleen?.['display_name']).toBe('Coleen');
+        expect(coleen?.['distance_m']).toBe(280.1);
+        expect(coleen?.['closeness']).toEqual({ level: 5, level_source: 'demo_profile' });
+        expect(provider.calls.assess).toHaveLength(0);
+        expect(provider.calls.advise).toHaveLength(0);
+      } finally {
+        await app.close();
+      }
+    }
+  });
+
+  it('updates the candidate set when the radius changes', async () => {
     const provider = createCountingProvider();
-    const app = await buildApp({ db, ai: { provider, config: CONFIG } });
+    const narrow = createAiFakeDb({
+      relationships: APPROVED,
+      nearby: NEARBY_BY_RADIUS[500],
+      profiles: PROFILES,
+    });
+    const wide = createAiFakeDb({
+      relationships: APPROVED,
+      nearby: NEARBY_BY_RADIUS[5000],
+      profiles: PROFILES,
+    });
+    const narrowApp = await buildApp({ db: narrow, ai: { provider, config: CONFIG } });
+    const wideApp = await buildApp({ db: wide, ai: { provider, config: CONFIG } });
     try {
-      const { status, body } = await json(app, 'GET', '/ai-circle/opportunities?radius_m=5000');
-      expect(status).toBe(200);
-      const candidates = body['candidates'] as Array<Record<string, unknown>>;
-      const nicole = candidates.find((c) => c['id'] === 'nicole');
-      expect(nicole?.['display_name']).toBe('Nicole');
-      expect(nicole?.['distance_m']).toBe(2476.4);
-      expect(nicole?.['closeness']).toEqual({ level: 4, level_source: 'demo_profile' });
-      expect(provider.calls.assess).toHaveLength(0);
-      expect(provider.calls.advise).toHaveLength(0);
+      const at500 = await json(narrowApp, 'GET', '/ai-circle/opportunities?radius_m=500');
+      const at5000 = await json(wideApp, 'GET', '/ai-circle/opportunities?radius_m=5000');
+      expect(at500.body['radius_m']).toBe(500);
+      expect(at5000.body['radius_m']).toBe(5000);
+      expect(candidateIds(at500.body)).toEqual(['coleen']);
+      expect(candidateIds(at5000.body)).toEqual(['coleen', 'alex', 'sam', 'rhea']);
     } finally {
-      await app.close();
+      await narrowApp.close();
+      await wideApp.close();
     }
   });
 
   it('keeps genuinely ineligible candidates out while restoring the merely lapsed', async () => {
     const db = createAiFakeDb({
-      relationships: { ...APPROVED_5KM, 'you:marco': 'approved' },
+      relationships: { ...APPROVED, 'you:marco': 'approved' },
       nearby: [
-        ...NEARBY_5KM,
+        ...(NEARBY_BY_RADIUS[5000] ?? []),
         { id: 'marco', display_name: 'Marco', distance_m: 600.2, bearing_deg: 220.0 },
       ],
-      profiles: { ...PROFILES_5KM, 'you:marco': profile(2, 'stable') },
+      profiles: { ...PROFILES, 'you:marco': profile(2, 'stable') },
       feedback: [
         // Permanent dismissal: stays suppressed.
-        { owner_id: 'you', friend_id: 'coleen', kind: 'dismiss', created_at: new Date('2026-05-20T12:00:00.000Z'), expires_at: null },
+        { owner_id: 'you', friend_id: 'alex', kind: 'dismiss', created_at: new Date('2026-05-20T12:00:00.000Z'), expires_at: null },
         // Unexpired snooze: stays suppressed (fake clock is 2026-06-01).
         { owner_id: 'you', friend_id: 'marco', kind: 'snooze', created_at: new Date('2026-05-31T12:00:00.000Z'), expires_at: new Date('2026-06-02T12:00:00.000Z') },
         // Expired snooze: eligible again.
@@ -171,7 +209,7 @@ describe('debug-9 radar / nearby / reconnect consistency', () => {
     try {
       const { status, body } = await json(app, 'GET', '/ai-circle/opportunities?radius_m=5000');
       expect(status).toBe(200);
-      expect(candidateIds(body)).toEqual(['alex', 'sam', 'nicole', 'rhea']);
+      expect(candidateIds(body)).toEqual(['coleen', 'sam', 'rhea']);
     } finally {
       await app.close();
     }
@@ -179,9 +217,9 @@ describe('debug-9 radar / nearby / reconnect consistency', () => {
 
   it('refuses advice for non-friends without inference (privacy intact)', async () => {
     const db = createAiFakeDb({
-      relationships: { ...APPROVED_5KM, 'you:nina': 'pending' },
-      nearby: NEARBY_5KM,
-      profiles: PROFILES_5KM,
+      relationships: APPROVED,
+      nearby: NEARBY_BY_RADIUS[5000],
+      profiles: PROFILES,
       prefs: {
         you: {
           analysis_consent: true,

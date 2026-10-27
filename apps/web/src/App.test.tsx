@@ -436,7 +436,7 @@ describe('Near-Circle Phase 2 UI', () => {
     expect(screen.queryByRole('button', { name: 'Ask Meta AI' })).not.toBeInTheDocument();
   });
 
-  it('shows eligible Rhea and Nicole panels in Reconnect today without asking AI', async () => {
+  it('shows eligible Coleen and Rhea panels in Reconnect today without asking AI', async () => {
     const requested: string[] = [];
     installFetch(
       {
@@ -445,12 +445,12 @@ describe('Near-Circle Phase 2 UI', () => {
           radius_m: 5000,
           candidates: [
             {
-              id: 'nicole',
-              display_name: 'Nicole',
-              distance_m: 2476.4,
-              bearing_deg: 195.4,
-              walk_minutes: 35,
-              closeness: { level: 4, level_source: 'demo_profile' },
+              id: 'coleen',
+              display_name: 'Coleen',
+              distance_m: 280.1,
+              bearing_deg: 45,
+              walk_minutes: 4,
+              closeness: { level: 5, level_source: 'demo_profile' },
               context: 'Nearby and available for discovery',
             },
             {
@@ -472,10 +472,10 @@ describe('Near-Circle Phase 2 UI', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open Near-Circle' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Reconnect today' }));
     expect(await screen.findByRole('heading', { name: 'Reconnect today' })).toBeInTheDocument();
+    expect(screen.getByText('Coleen', { selector: 'h3' })).toBeInTheDocument();
     expect(screen.getByText('Rhea', { selector: 'h3' })).toBeInTheDocument();
-    expect(screen.getByText('Nicole', { selector: 'h3' })).toBeInTheDocument();
+    expect(screen.getByText(/Tier 5/)).toBeInTheDocument();
     expect(screen.getByText(/Tier 3/)).toBeInTheDocument();
-    expect(screen.getByText(/Tier 4/)).toBeInTheDocument();
     // Browsing candidates never triggers inference; only Ask does.
     expect(requested.some((entry) => entry.includes('/advise'))).toBe(false);
     expect(screen.getAllByRole('button', { name: 'Ask Meta AI' })).toHaveLength(2);

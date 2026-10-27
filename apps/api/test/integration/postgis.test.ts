@@ -37,7 +37,7 @@ describe('PostGIS proximity (live database)', () => {
         [500, ['coleen']],
         [1000, ['coleen', 'alex']],
         [2000, ['coleen', 'alex', 'sam']],
-        [5000, ['coleen', 'alex', 'sam', 'nicole', 'rhea']],
+        [5000, ['coleen', 'alex', 'sam', 'rhea']],
       ];
       for (const [radius, ids] of expectations) {
         const res = await app.inject({ method: 'GET', url: `/friends/nearby?radius_m=${radius}` });
@@ -57,7 +57,7 @@ describe('PostGIS proximity (live database)', () => {
       expect(res.statusCode).toBe(200);
       const body = res.json() as { friends: Array<{ id: string }> };
       const ids = body.friends.map((f) => f.id);
-      for (const excluded of ['marco', 'liza', 'jose', 'nina', 'paolo']) {
+      for (const excluded of ['marco', 'liza', 'jose', 'nina', 'paolo', 'nicole']) {
         expect(ids.includes(excluded)).toBe(false);
       }
     } finally {
@@ -79,7 +79,6 @@ describe('PostGIS proximity (live database)', () => {
         coleen: { lat: 14.5827902, lon: 120.9768376 },
         alex: { lat: 14.5743222, lon: 120.9762089 },
         sam: { lat: 14.581, lon: 120.9610766 },
-        nicole: { lat: 14.5595, lon: 120.969 },
         rhea: { lat: 14.6094938, lon: 120.980158 },
       };
       for (const friend of body.friends) {
@@ -156,13 +155,16 @@ describe('PostGIS proximity (live database)', () => {
     try {
       const before = await tableCounts(pool);
       const sql = readFileSync(join(ROOT, 'db/seed/phase2-demo.sql'), 'utf8');
-      const reconnect = readFileSync(join(ROOT, 'db/seed/reconnect-demo.sql'), 'utf8');
+      const ai = readFileSync(join(ROOT, 'db/seed/ai-demo.sql'), 'utf8');
       await pool.query(sql);
       await pool.query(sql);
-      await pool.query(reconnect);
-      await pool.query(reconnect);
+      await pool.query(ai);
+      await pool.query(ai);
       const after = await tableCounts(pool);
       expect(after).toEqual(before);
+      // Debug-10: the removed Nicole fixture must not come back on re-seed.
+      const nicole = await pool.query('SELECT COUNT(*)::int AS c FROM users WHERE id = $1', ['nicole']);
+      expect(nicole.rows[0].c).toBe(0);
     } finally {
       await pool.end();
     }
