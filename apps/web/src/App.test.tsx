@@ -9,6 +9,7 @@ interface MockRoutes {
   nearby?: (radius: string) => unknown;
   friends?: unknown;
   detail?: unknown;
+  route?: unknown;
   health?: unknown;
   putVisibility?: (body: { enabled: boolean }) => unknown;
   failUrls?: string[];
@@ -67,6 +68,10 @@ function installFetch(routes: MockRoutes = {}, requested: string[] = []) {
     if (url.includes('/friends/nearby')) {
       const radius = new URL(url, 'http://test').searchParams.get('radius_m') ?? '1000';
       return jsonResponse(routes.nearby !== undefined ? routes.nearby(radius) : DEFAULT_NEARBY);
+    }
+    if (url.includes('/route')) {
+      if (routes.route === undefined) return jsonResponse({}, 404);
+      return jsonResponse(routes.route);
     }
     if (url.includes('/friends/') && !url.endsWith('/friends')) {
       return jsonResponse(routes.detail ?? DEFAULT_DETAIL);
@@ -137,7 +142,43 @@ describe('Near-Circle Phase 2 UI', () => {
     expect(screen.getByText('About 280 m away.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'View walking route' }));
     expect(screen.getByLabelText('Walking route')).toBeInTheDocument();
-    expect(screen.getByText(/not connected yet/)).toBeInTheDocument();
+    expect(await screen.findByText('No walking route available.')).toBeInTheDocument();
+  });
+
+  it('shows the walking route with map and stats', async () => {
+    installFetch({
+      route: {
+        demo: true,
+        radius_m: 1000,
+        route: {
+          to: { id: 'coleen', display_name: 'Coleen' },
+          center: { lat: 14.581, lon: 120.975 },
+          target: { lat: 14.5828, lon: 120.9768 },
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [120.975, 14.581],
+              [120.9768, 14.5828],
+            ],
+          },
+          route_distance_m: 340.5,
+          straight_line_m: 280.1,
+          duration_s: 245,
+          estimated_steps: 454,
+          stride_m: 0.75,
+        },
+      },
+    });
+    render(<App />);
+    await screen.findByText('Chats');
+    fireEvent.click(screen.getByRole('button', { name: 'Open Near-Circle' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Select Coleen' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'View walking route' }));
+    expect(
+      await screen.findByRole('application', { name: 'Walking route map to Coleen' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('341 m')).toBeInTheDocument();
+    expect(screen.getByText('4 min')).toBeInTheDocument();
   });
 
   it('toggles visibility through the API and gates the radar', async () => {

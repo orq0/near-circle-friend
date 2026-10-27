@@ -83,7 +83,7 @@ if (Wait-HttpOk -Url $webUrl -TimeoutSec 120) {
 if (-not (Test-Path $graphFile)) {
     Write-NcStatus 'near-circle-routing-walk' 'not-ready' 'no pedestrian graph yet (Phase 3 bootstrap; see routing/README.md)'
 } else {
-    $routeProbe = "$($nc['ROUTING_WALK_HOST_URL'])/route/v1/driving/13.388860,52.517037;13.385983,52.496891?overview=false"
+    $routeProbe = "$($nc['ROUTING_WALK_HOST_URL'])/route/v1/driving/120.9750,14.5810;120.9768,14.5828?overview=false"
     if (Wait-HttpOk -Url $routeProbe -TimeoutSec 60) {
         Write-NcStatus 'near-circle-routing-walk' 'healthy' $nc['ROUTING_WALK_HOST_URL']
     } else {

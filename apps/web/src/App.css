@@ -488,20 +488,33 @@ body {
   width: 100%;
 }
 
-/* ---- Route stub ---- */
-.map-stub {
-  min-height: 170px;
+/* ---- Route map ---- */
+.route-map {
+  height: 300px;
   border-radius: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  padding: 20px;
-  color: var(--nc-muted);
-  font-size: 14px;
-  background:
-    repeating-linear-gradient(45deg, #f4f6f9 0 14px, #e9edf2 14px 28px);
   border: 1px solid var(--nc-line);
+  overflow: hidden;
+  background: var(--nc-wash);
+  z-index: 0;
+}
+
+.route-compare {
+  margin: 0;
+  font-size: 14px;
+  text-align: center;
+}
+
+.map-fallback {
+  margin: 0;
+  padding: 120px 20px;
+  font-size: 14px;
+  color: var(--nc-muted);
+  text-align: center;
+}
+
+.alert-sub {
+  font-weight: 400 !important;
+  font-size: 13px !important;
 }
 
 .stat-row {

@@ -31,7 +31,17 @@ export interface FakeData {
     distance_m: number | null;
     bearing_deg: number | null;
   } | null;
+  routeDetail?: {
+    id: string;
+    display_name: string;
+    near_circle_enabled: boolean;
+    fresh: boolean;
+    lat: number | null;
+    lon: number | null;
+    straight_line_m: number | null;
+  } | null;
   connectionError?: boolean;
+  connectionCode?: string;
 }
 
 const DEFAULT_REQUESTER: FakeRequester = {
@@ -46,9 +56,8 @@ export function createFakeDb(data: FakeData = {}): Queryable {
   return {
     async query<T extends QueryResultRow>(text: string): Promise<{ rows: T[] }> {
       if (data.connectionError === true) {
-        throw Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:5433'), {
-          code: 'ECONNREFUSED',
-        });
+        const code = data.connectionCode ?? 'ECONNREFUSED';
+        throw Object.assign(new Error(`connect ${code} 127.0.0.1:5433`), { code });
       }
       let rows: QueryResultRow[];
       if (text.includes('FROM (SELECT 1) AS dummy')) {
@@ -70,6 +79,9 @@ export function createFakeDb(data: FakeData = {}): Queryable {
         ];
       } else if (text.includes('location_state')) {
         rows = data.friends ?? [];
+      } else if (text.includes('straight_line_m')) {
+        rows =
+          data.routeDetail === undefined || data.routeDetail === null ? [] : [data.routeDetail];
       } else if (text.includes('WHERE u.id = $2')) {
         rows = data.detail === undefined || data.detail === null ? [] : [data.detail];
       } else {

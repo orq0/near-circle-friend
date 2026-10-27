@@ -4,6 +4,7 @@ import {
   fetchFriendDetail,
   fetchFriends,
   fetchNearby,
+  fetchRoute,
   fetchVisibility,
   setVisibilityRemote,
 } from './api';
@@ -11,9 +12,11 @@ import { FRIENDS } from './mockData';
 import type {
   Friend,
   FriendDetail,
+  FriendRouteInfo,
   FriendStatusInfo,
   NearbyFriend,
   RadarStatus,
+  RouteStatus,
   Screen,
   VisibilityState,
 } from './types';
@@ -38,6 +41,10 @@ export function App() {
   const [detail, setDetail] = useState<FriendDetail | null>(null);
   const [detailError, setDetailError] = useState(false);
   const [detailNonce, setDetailNonce] = useState(0);
+
+  const [routeStatus, setRouteStatus] = useState<RouteStatus>('loading');
+  const [routeInfo, setRouteInfo] = useState<FriendRouteInfo | null>(null);
+  const [routeNonce, setRouteNonce] = useState(0);
 
   const [selectedConvoId, setSelectedConvoId] = useState(FRIENDS[0]?.id ?? '');
   const [chatOpen, setChatOpen] = useState(false);
@@ -108,6 +115,29 @@ export function App() {
     };
   }, [screen, selectedNearby, radiusM, detailNonce]);
 
+  // Pedestrian route for the selected dot. Geometry always comes from the
+  // backend router; failures render as honest unavailable/error states.
+  useEffect(() => {
+    if (screen !== 'route' || selectedNearby === null) return;
+    let cancelled = false;
+    setRouteStatus('loading');
+    setRouteInfo(null);
+    fetchRoute(selectedNearby.id, radiusM).then((result) => {
+      if (cancelled) return;
+      if (result.kind === 'route') {
+        setRouteInfo(result.route);
+        setRouteStatus('ready');
+      } else if (result.kind === 'unavailable') {
+        setRouteStatus('unavailable');
+      } else {
+        setRouteStatus('error');
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [screen, selectedNearby, radiusM, routeNonce]);
+
   const handleVisibilityChange = useCallback(async (next: boolean) => {
     setVisibilityError(false);
     const saved = await setVisibilityRemote(next);
@@ -170,7 +200,13 @@ export function App() {
           />
         )}
         {screen === 'route' && selectedNearby !== null && (
-          <RouteScreen displayName={selectedNearby.display_name} onBack={() => setScreen('friend')} />
+          <RouteScreen
+            displayName={selectedNearby.display_name}
+            status={routeStatus}
+            route={routeInfo}
+            onRetry={() => setRouteNonce((n) => n + 1)}
+            onBack={() => setScreen('friend')}
+          />
         )}
       </main>
     </div>

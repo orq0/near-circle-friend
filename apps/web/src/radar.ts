@@ -26,6 +26,15 @@ export function formatDistance(meters: number): string {
   return `${km >= 10 ? Math.round(km) : Math.round(km * 10) / 10} km`;
 }
 
+export function formatDuration(totalSeconds: number): string {
+  if (!Number.isFinite(totalSeconds) || totalSeconds < 0) return '—';
+  const minutes = Math.round(totalSeconds / 60);
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest === 0 ? `${hours} h` : `${hours} h ${rest} min`;
+}
+
 export const RADII_M = [500, 1000, 2000, 5000] as const;
 
 export function formatRadius(meters: number): string {

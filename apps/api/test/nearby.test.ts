@@ -95,4 +95,18 @@ describe('GET /friends/nearby', () => {
       await app.close();
     }
   });
+
+  it('reports 503 for socket-level denials as well', async () => {
+    const app = await buildApp({
+      db: createFakeDb({ connectionError: true, connectionCode: 'EACCES' }),
+    });
+    try {
+      const res = await app.inject({ method: 'GET', url: '/friends/nearby?radius_m=1000' });
+      expect(res.statusCode).toBe(503);
+      const body = res.json() as { error: string };
+      expect(body.error).toBe('database unavailable');
+    } finally {
+      await app.close();
+    }
+  });
 });

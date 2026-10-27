@@ -49,6 +49,9 @@ export function isConnectionError(err: unknown): boolean {
     code === 'ENOTFOUND' ||
     code === 'ETIMEDOUT' ||
     code === 'EHOSTUNREACH' ||
-    code === 'ENETUNREACH'
+    code === 'ENETUNREACH' ||
+    code === 'EACCES' ||
+    code === 'EPIPE' ||
+    code === 'ECONNRESET'
   );
 }

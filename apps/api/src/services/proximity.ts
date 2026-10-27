@@ -1,6 +1,8 @@
 import { type Queryable, isConnectionError } from '../db.js';
 import { ApiError } from '../errors.js';
 import { type LatLon } from '../geo.js';
+import { estimateSteps } from '../routing/steps.js';
+import { type RouteGeometry, type WalkingRoutingProvider } from '../routing/types.js';
 
 // Phase 2 demo context: a single explicitly local demo user. No fake auth.
 export const DEMO_USER_ID = 'you';
@@ -276,5 +278,82 @@ export async function getFriendDetail(
     discoverable,
     distance_m: discoverable ? row.distance_m : null,
     bearing_deg: discoverable && row.bearing_deg !== null ? row.bearing_deg : null,
+  };
+}
+
+export interface FriendRoute {
+  to: { id: string; display_name: string };
+  center: LatLon;
+  target: LatLon;
+  geometry: RouteGeometry;
+  route_distance_m: number;
+  straight_line_m: number;
+  duration_s: number;
+  estimated_steps: number;
+  stride_m: number;
+}
+
+/**
+ * Consent-rechecked pedestrian route. Relationship, consent, radius, and
+ * freshness are all re-verified at request time; only then is the walking
+ * router consulted. Never fabricates geometry on provider failure.
+ */
+export async function getFriendRoute(
+  db: Queryable,
+  provider: WalkingRoutingProvider,
+  userId: string,
+  friendId: string,
+  radiusM: number,
+  strideM: number,
+): Promise<FriendRoute> {
+  const state = await requesterState(db, userId);
+  const center = requireDiscoverableRequester(state);
+  const rows = await queryRows<{
+    id: string;
+    display_name: string;
+    near_circle_enabled: boolean;
+    fresh: boolean;
+    lat: number | null;
+    lon: number | null;
+    straight_line_m: number | null;
+  }>(
+    db,
+    `SELECT u.id AS id, u.display_name AS display_name,
+            COALESCE(v.enabled, FALSE) AS near_circle_enabled,
+            (l.user_id IS NOT NULL AND l.expires_at > NOW()) AS fresh,
+            ST_Y(l.geography_point::geometry)::float8 AS lat,
+            ST_X(l.geography_point::geometry)::float8 AS lon,
+            ST_Distance(me.geography_point, l.geography_point)::float8 AS straight_line_m
+       FROM users u
+       JOIN relationships r ON r.friend_id = u.id AND r.user_id = $1 AND r.status = 'approved'
+       LEFT JOIN visibility v ON v.user_id = u.id
+       LEFT JOIN locations l ON l.user_id = u.id
+       JOIN locations me ON me.user_id = $1
+      WHERE u.id = $2 AND u.id <> $1`,
+    [userId, friendId],
+  );
+  const row = rows[0];
+  if (row === undefined) throw new ApiError(404, 'friend not found');
+  if (!row.near_circle_enabled || !row.fresh || row.lat === null || row.lon === null) {
+    throw new ApiError(403, 'friend unavailable for routing');
+  }
+  if (row.straight_line_m === null) {
+    throw new ApiError(409, 'current location unavailable or stale');
+  }
+  if (row.straight_line_m > radiusM) {
+    throw new ApiError(403, 'friend is outside the discovery radius');
+  }
+  const target: LatLon = { lat: row.lat, lon: row.lon };
+  const route = await provider.route(center, target);
+  return {
+    to: { id: row.id, display_name: row.display_name },
+    center,
+    target,
+    geometry: route.geometry,
+    route_distance_m: route.distance_m,
+    straight_line_m: row.straight_line_m,
+    duration_s: route.duration_s,
+    estimated_steps: estimateSteps(route.distance_m, strideM),
+    stride_m: strideM,
   };
 }

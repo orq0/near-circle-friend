@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatDistance, formatRadius, positionOnRadar } from './radar';
+import { formatDistance, formatDuration, formatRadius, positionOnRadar } from './radar';
 
 describe('positionOnRadar', () => {
   it('places the center at 50/50', () => {
@@ -56,6 +56,23 @@ describe('formatDistance', () => {
   it('renders invalid input as a dash', () => {
     expect(formatDistance(Number.NaN)).toBe('—');
     expect(formatDistance(-5)).toBe('—');
+  });
+});
+
+describe('formatDuration', () => {
+  it('formats minutes below an hour', () => {
+    expect(formatDuration(245)).toBe('4 min');
+    expect(formatDuration(30)).toBe('1 min');
+  });
+
+  it('formats hours and minutes', () => {
+    expect(formatDuration(3600)).toBe('1 h');
+    expect(formatDuration(5400)).toBe('1 h 30 min');
+  });
+
+  it('renders invalid input as a dash', () => {
+    expect(formatDuration(Number.NaN)).toBe('—');
+    expect(formatDuration(-5)).toBe('—');
   });
 });
 

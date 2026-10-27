@@ -69,7 +69,7 @@ services:
     profiles: ["routing"]
     command: ["osrm-routed", "--algorithm", "mld", "/data/near-circle.osrm"]
     ports:
-      - "${ROUTING_WALK_PORT:-5001}:5000"
+      - "${ROUTING_WALK_PORT:-5002}:5000"
     volumes:
       - ./routing/data:/data:ro
     restart: "no"

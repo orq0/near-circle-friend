@@ -116,6 +116,28 @@ The demo context is the local user `you`; no authentication system is introduced
 
 Live-database integration tests: `$env:RUN_INTEGRATION_TESTS='1'; npm --workspace apps/api run test:integration`.
 
+## Phase 3 — Pedestrian routing (implemented; graph bootstrap required)
+
+Walking routes are computed by a project-owned OSRM foot-profile service over a Metro Manila extract. The API serves validated route geometry through `GET /friends/:id/route`; the UI renders it on an interactive OpenStreetMap with distance, walk time, and estimated steps, always distinguishing on-foot distance from the straight line.
+
+### One-time graph bootstrap
+
+Requires Docker with ~2 GB free. Port 5002 must be free (5001 is reserved for the unrelated instance already there).
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File ./routing/prepare-graph.ps1
+npm run startall   # routing profile enables automatically once the graph exists
+npm run status     # expect near-circle-routing-walk: healthy
+```
+
+Details, data provenance (© OpenStreetMap contributors, ODbL), and the direct API test live in [`routing/README.md`](./routing/README.md).
+
+### Notes
+
+- Native API development needs `ROUTING_WALK_URL=http://localhost:5002` (the in-Compose default only resolves inside Docker).
+- Until the bootstrap runs, the route screen honestly reports unavailability; nothing fabricates geometry.
+- Step counts are labeled estimates from the configured stride (default 0.75 m).
+
 ## Project structure
 
 ```text
@@ -146,7 +168,7 @@ See [`.env.example`](./.env.example). Ports, credentials, routing endpoints, and
 |---|---|---|
 | **1 — Foundation** | Mock Messenger UI, API skeleton, PostGIS infrastructure, OSRM service boundary, unified launcher | In progress / verify against tests |
 | **2 — Proximity discovery** | Real PostGIS radius queries, friend eligibility, and radar positioning | Implemented |
-| **3 — Walking routes** | Dedicated pedestrian OSRM graph, street-map overlay, ETA, and step estimation | Planned |
+| **3 — Walking routes** | Dedicated pedestrian OSRM graph, street-map overlay, ETA, and step estimation | Implemented (graph bootstrap required) |
 | **4 — API validation** | Strict schemas, permission enforcement, location freshness, security and lifecycle tests | Planned |
 | **5 — Meta AI** | Real Meta Model API-powered meetup assistance | Planned |
 | **6 — Submission** | Optional approved Facebook Login integration, demo evidence, public repository, and provenance | Planned |

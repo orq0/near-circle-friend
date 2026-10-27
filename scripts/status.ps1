@@ -71,7 +71,7 @@ $rtNote = Get-ContainerNote 'near-circle-routing-walk'
 if (-not (Test-Path $graphFile)) {
     Write-NcStatus 'near-circle-routing-walk' 'not-ready' ("no pedestrian graph (Phase 3); {0}" -f $rtNote)
 } else {
-    $routeProbe = "$($nc['ROUTING_WALK_HOST_URL'])/route/v1/driving/13.388860,52.517037;13.385983,52.496891?overview=false"
+    $routeProbe = "$($nc['ROUTING_WALK_HOST_URL'])/route/v1/driving/120.9750,14.5810;120.9768,14.5828?overview=false"
     if (Test-HttpOk -Url $routeProbe -TimeoutSec 5) {
         Write-NcStatus 'near-circle-routing-walk' 'healthy' ("{0}; {1}" -f $nc['ROUTING_WALK_HOST_URL'], $rtNote)
     } else {
