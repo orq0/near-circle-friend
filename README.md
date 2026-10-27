@@ -56,22 +56,23 @@ Ni-Ce-Friend is an independent concept prototype developed for the Meta Global A
 
 ## Application Screenshots
 
-Screenshots are captured from the running application at 1440 × 900. Start the stack (see below), open <http://localhost:5173>, and save the four views into `docs/screenshots/`:
+Captured from the running application (Messenger-inspired interface, live PostGIS radar, and real OSRM routing):
 
-| File | What it shows |
-|---|---|
-| `docs/screenshots/messenger-inbox.png` | Messenger-inspired inbox: conversation list, search, avatars, Near-Circle entry point |
-| `docs/screenshots/near-circle-radar.png` | Near-Circle radar: you at center, red friend dots, radius selector |
-| `docs/screenshots/friend-details.png` | Selected friend with proximity distance and walking-route action |
-| `docs/screenshots/walking-route.png` | OpenStreetMap with the real OSRM route, distance, ETA, and steps |
+### Messenger Experience
 
-<!--
-Once the four PNGs exist in docs/screenshots/, the GitHub gallery is:
 ![Ni-Ce-Friend Messenger Interface](docs/screenshots/messenger-inbox.png)
+
+### Interactive Proximity Radar
+
 ![Ni-Ce-Friend Near-Circle Radar](docs/screenshots/near-circle-radar.png)
+
+### Nearby Friend Discovery
+
 ![Ni-Ce-Friend Friend Details](docs/screenshots/friend-details.png)
+
+### Pedestrian Navigation
+
 ![Ni-Ce-Friend Walking Route](docs/screenshots/walking-route.png)
--->
 
 ## How Ni-Ce-Friend Works
 
