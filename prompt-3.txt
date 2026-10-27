@@ -1,0 +1,77 @@
+# Near-Circle — Phase 3: Pedestrian Routing and Interactive Maps
+
+Continue development of Near-Circle from local commit `22ea755`.
+
+Project: `E:\hacathon\meta\near-circle-friend`
+
+## Objective
+
+Implement real pedestrian routing for the existing Near-Circle friend-discovery interface using an independent OSRM instance and OpenStreetMap data covering Metro Manila, Philippines.
+
+Preserve all Phase 1 and Phase 2 features.
+
+## Requirements
+
+1. Inspect existing routing configuration, Docker Compose, API endpoints, and frontend before changing anything.
+2. Prepare an independent Metro Manila pedestrian routing pipeline using OSRM and an appropriate walking profile.
+3. Do not use existing Navegar, mapa, or Tara routing graphs, datasets, containers, or services.
+4. Do not interfere with the unknown OSRM service previously observed on port 5001. Check for conflicts before proposing any new port assignment.
+5. Integrate the pedestrian router with the existing Fastify API.
+6. Display an interactive OpenStreetMap-based map when a user selects a nearby friend.
+7. Render the actual pedestrian route between the demo user and selected friend.
+8. Display:
+   - Walking distance in meters/kilometers.
+   - Estimated walking duration.
+   - Estimated number of steps, using a configurable default stride length of 0.75 meters.
+9. Clearly distinguish straight-line proximity distance from pedestrian route distance.
+10. Handle unavailable routes, disconnected roads, API errors, and missing routing data without displaying fabricated results.
+11. Add automated tests for route responses, coordinate validation, step estimation, and routing availability.
+12. Maintain all existing API, database, frontend, and radar functionality.
+
+## Dataset and routing constraints
+
+Use Metro Manila OpenStreetMap data and a pedestrian-compatible OSRM routing profile.
+
+Do not substitute car routing for walking routing.
+
+Preserve the existing optional Docker Compose routing profile.
+
+Inspect the actual OSRM image and available profiles before designing preprocessing commands.
+
+Document the dataset source, licensing, attribution, storage requirements, and graph preparation process.
+
+If graph generation or Docker operations require permissions unavailable in your sandbox, prepare the necessary scripts and provide exact PowerShell commands for manual execution.
+
+Do not request elevated permissions.
+
+## Operational restrictions
+
+- No elevated execution.
+- No unauthorized GitHub pushes.
+- No destructive Docker commands.
+- No deletion of existing volumes or routing datasets.
+- No modifications to other repositories.
+- No Git history rewriting or stashing.
+- No Meta AI integration yet.
+- No changes to Facebook integration.
+- Local commits only.
+
+## Completion requirements
+
+Report:
+
+1. Implemented functionality.
+2. Files changed.
+3. Metro Manila routing data source.
+4. Graph preparation instructions.
+5. Routing API endpoints.
+6. Test results.
+7. Known limitations.
+8. Local commit hash.
+9. Manual verification commands.
+
+Do not claim pedestrian routing works until a real Metro Manila pedestrian route has been successfully calculated.
+
+Preserve Phase 2 functionality and stop after Phase 3.
+
+**Important:** Prioritize accuracy, maintainability, and operational safety over unnecessary architectural changes.
