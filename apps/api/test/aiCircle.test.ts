@@ -205,11 +205,20 @@ describe('AI settings and consent revocation', () => {
         { analysis_consent: 'yes' },
         { quiet_start_min: 1500 },
         { quiet_end_min: -1 },
-        'nope',
       ]) {
-        const res = await app.inject({ method: 'PUT', url: '/ai-circle/settings', payload: payload as never });
+        const res = await app.inject({ method: 'PUT', url: '/ai-circle/settings', payload });
         expect(res.statusCode).toBe(400);
       }
+      // A non-object JSON body must reach our validator (400). A raw string
+      // without a JSON content-type is 415 from Fastify itself — framework
+      // behavior we intentionally preserve.
+      const nonObject = await app.inject({
+        method: 'PUT',
+        url: '/ai-circle/settings',
+        payload: '"nope"',
+        headers: { 'content-type': 'application/json' },
+      });
+      expect(nonObject.statusCode).toBe(400);
     } finally {
       await app.close();
     }
@@ -379,8 +388,10 @@ describe('AI assessment jobs', () => {
     try {
       const res = await app.inject({ method: 'POST', url: '/ai-circle/closeness/alex/assess' });
       expect(res.statusCode).toBe(202);
-      const summary = await processPendingJobs(db, provider, CONFIG);
-      expect(summary.completed).toBe(1);
+      // The route kicks the runner fire-and-forget; awaiting the drain joins
+      // it, so assert converged state rather than the racy returned summary.
+      await processPendingJobs(db, provider, CONFIG);
+      expect(db.state.jobs.find((j) => j['status'] === 'completed')).toBeDefined();
       expect(provider.calls.assess).toHaveLength(1);
       const profile = db.state.profiles['you:alex'];
       expect(profile?.['source']).toBe('meta_live');
@@ -435,9 +446,10 @@ describe('AI assessment jobs', () => {
     try {
       const res = await app.inject({ method: 'POST', url: '/ai-circle/closeness/alex/assess' });
       expect(res.statusCode).toBe(202);
-      const summary = await processPendingJobs(db, provider, NO_KEY);
-      expect(summary.unavailable).toBe(1);
+      // Join the route's fire-and-forget runner, then assert converged state.
+      await processPendingJobs(db, provider, NO_KEY);
       expect(provider.calls.assess).toHaveLength(0);
+      expect(db.state.jobs.find((j) => j['status'] === 'unavailable')).toBeDefined();
       expect(db.state.jobs[0]?.['status']).toBe('unavailable');
     } finally {
       await app.close();

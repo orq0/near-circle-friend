@@ -55,6 +55,25 @@ export function createAiFakeDb(seed: AiFakeSeed = {}): Queryable & { state: Requ
     nextJobId: seed.nextJobId ?? 1,
     now: seed.now ?? new Date('2026-06-01T12:00:00.000Z'),
   };
+  // Deep-copy seeds: tests share module-level fixtures, and in-place writes
+  // must never leak from one test into another.
+  for (const key of [
+    'relationships',
+    'prefs',
+    'signals',
+    'profiles',
+    'overrides',
+    'jobs',
+    'advice',
+    'feedback',
+    'usage',
+    'requester',
+    'nearby',
+    'detail',
+    'routeDetail',
+  ] as const) {
+    (state as Record<string, unknown>)[key] = structuredClone(state[key]);
+  }
 
   function dayKey(owner: string): string {
     return `${owner}:${state.now.toISOString().slice(0, 10)}`;
@@ -88,17 +107,19 @@ export function createAiFakeDb(seed: AiFakeSeed = {}): Queryable & { state: Requ
       }
       // --- revocation --------------------------------------------------------
       if (text.includes("ai_circle_reassessment_jobs SET status = 'cancelled'")) {
-        for (const job of state.jobs) {
-          if (job['owner_id'] === p(0) && (job['status'] === 'pending' || job['status'] === 'running')) {
-            job['status'] = 'cancelled';
-            job['finished_at'] = state.now;
-          }
-        }
+        // Replace rows instead of mutating: seeds may share references.
+        state.jobs = state.jobs.map((job) =>
+          job['owner_id'] === p(0) && (job['status'] === 'pending' || job['status'] === 'running')
+            ? { ...job, status: 'cancelled', finished_at: state.now }
+            : job,
+        );
         return { rows: [] as unknown as T[] };
       }
       if (text.includes('ai_circle_friendship_profiles SET status =')) {
         for (const key of Object.keys(state.profiles)) {
-          if (key.startsWith(`${p(0)}:`)) (state.profiles[key] as Record<string, unknown>)['status'] = 'revoked';
+          if (key.startsWith(`${p(0)}:`)) {
+            state.profiles[key] = { ...(state.profiles[key] as Record<string, unknown>), status: 'revoked' };
+          }
         }
         return { rows: [] as unknown as T[] };
       }
@@ -321,7 +342,7 @@ export function createAiFakeDb(seed: AiFakeSeed = {}): Queryable & { state: Requ
       // --- usage ------------------------------------------------------------------
       if (text.startsWith('INSERT INTO ai_circle_usage')) {
         const key = dayKey(p(0));
-        const row = state.usage[key] ?? {
+        const prev = state.usage[key] ?? {
           model_requests: 0,
           cache_hits: 0,
           cache_misses: 0,
@@ -329,6 +350,8 @@ export function createAiFakeDb(seed: AiFakeSeed = {}): Queryable & { state: Requ
           output_tokens: 0,
           rate_limited: 0,
         };
+        // Copy before incrementing: seeds may share references.
+        const row: Record<string, number> = { ...prev };
         if (text.includes('model_requests')) {
           row['model_requests'] += 1;
           row['input_tokens'] += Number(params[1]);
