@@ -252,9 +252,11 @@ describe('AI on-demand advice', () => {
       prefs: { you: { ...CONSENTED, quiet_start_min: 600, quiet_end_min: 780 } },
     });
     const provider = createCountingProvider();
-    vi.useFakeTimers();
     try {
-      // Freeze inside the quiet window (12:00 UTC).
+      // Freeze only the Date inside the quiet window (12:00 UTC).
+      // vi.setSystemTime without vi.useFakeTimers mocks just the clock:
+      // buildApp (avvio boot) and app.inject (light-my-request) need real
+      // setTimeout/setImmediate, which full fake timers would freeze and hang.
       vi.setSystemTime(new Date('2026-06-01T12:00:00.000Z'));
       const app = await buildApp({ db, ai: { provider, config: CONFIG } });
       try {
