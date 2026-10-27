@@ -218,4 +218,21 @@ describe('Near-Circle Phase 2 UI', () => {
       expect(screen.getByText('API unreachable')).toBeInTheDocument();
     });
   });
+
+  it('keeps the loading state while visibility cannot load', async () => {
+    // Broken /api path (e.g. a proxy pointing at container localhost):
+    // visibility stays null, so the loading state must persist instead of
+    // silently resolving.
+    installFetch({ failUrls: ['/near-circle/visibility'] });
+    render(<App />);
+    expect(await screen.findByText('Loading Near-Circle status…')).toBeInTheDocument();
+    expect(screen.queryByRole('switch', { name: 'Near-Circle visibility' })).not.toBeInTheDocument();
+  });
+
+  it('resolves the loading state once visibility loads', async () => {
+    installFetch();
+    render(<App />);
+    expect(await screen.findByRole('switch', { name: 'Near-Circle visibility' })).toBeInTheDocument();
+    expect(screen.queryByText('Loading Near-Circle status…')).not.toBeInTheDocument();
+  });
 });

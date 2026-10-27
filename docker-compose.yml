@@ -12,6 +12,10 @@ services:
       - "${WEB_PORT:-5173}:5173"
     environment:
       VITE_API_URL: ""
+      # In-network API address for the Vite /api proxy. `localhost` here would
+      # be the web container itself, so native dev keeps the localhost
+      # default from apps/web/vite.config.ts instead.
+      VITE_API_PROXY_TARGET: "http://near-circle-api:3001"
     depends_on:
       near-circle-api:
         condition: service_started

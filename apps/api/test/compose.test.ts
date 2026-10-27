@@ -34,3 +34,26 @@ describe('docker-compose routing boundary', () => {
     }
   });
 });
+
+describe('docker-compose web proxy', () => {
+  const VITE_CONFIG = readFileSync(join(ROOT, 'apps/web/vite.config.ts'), 'utf8');
+
+  function webServiceBlock(): string {
+    const start = COMPOSE.indexOf('near-circle-web:');
+    expect(start).toBeGreaterThan(-1);
+    const end = COMPOSE.indexOf('\n  near-circle-api:', start);
+    return COMPOSE.slice(start, end === -1 ? undefined : end);
+  }
+
+  it('points the web /api proxy at the in-network API, not container localhost', () => {
+    // Inside the web container, `localhost` is the web container itself, so a
+    // localhost proxy target breaks every /api call (stuck inbox loading state).
+    expect(webServiceBlock()).toContain('VITE_API_PROXY_TARGET: "http://near-circle-api:3001"');
+    expect(webServiceBlock()).not.toContain('localhost:3001');
+  });
+
+  it('keeps localhost:3001 as the native-dev proxy default', () => {
+    expect(VITE_CONFIG).toContain("process.env['VITE_API_PROXY_TARGET']");
+    expect(VITE_CONFIG).toContain('http://localhost:3001');
+  });
+});

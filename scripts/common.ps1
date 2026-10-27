@@ -15,7 +15,7 @@ function Read-NearCircleEnv {
         WEB_PORT             = '5173'
         API_PORT             = '3001'
         POSTGRES_PORT        = '5433'
-        ROUTING_WALK_PORT    = '5001'
+        ROUTING_WALK_PORT    = '5002'
         POSTGRES_USER        = 'near_circle'
         POSTGRES_DB          = 'near_circle'
         ROUTING_WALK_URL     = 'http://near-circle-routing-walk:5000'
