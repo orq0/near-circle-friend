@@ -1,6 +1,7 @@
-import type { FriendDetail } from '../types';
+import type { CircleInsight as CircleInsightData, FriendDetail } from '../types';
 import { formatDistance } from '../radar';
 import { PrototypeBanner } from './PrototypeBanner';
+import { CircleInsight } from './CircleInsight';
 
 interface FriendScreenProps {
   detail: FriendDetail | null;
@@ -8,9 +9,29 @@ interface FriendScreenProps {
   onViewRoute: () => void;
   onBack: () => void;
   onRetry: () => void;
+  insight: CircleInsightData | null;
+  insightError: boolean;
+  reassessmentPending: boolean;
+  overrideSaving: boolean;
+  onRetryInsight: () => void;
+  onRequestReassessment: () => void;
+  onSaveOverride: (level: number | null) => void;
 }
 
-export function FriendScreen({ detail, loadError, onViewRoute, onBack, onRetry }: FriendScreenProps) {
+export function FriendScreen({
+  detail,
+  loadError,
+  onViewRoute,
+  onBack,
+  onRetry,
+  insight,
+  insightError,
+  reassessmentPending,
+  overrideSaving,
+  onRetryInsight,
+  onRequestReassessment,
+  onSaveOverride,
+}: FriendScreenProps) {
   return (
     <section className="screen" aria-label="Selected friend">
       <PrototypeBanner />
@@ -56,6 +77,17 @@ export function FriendScreen({ detail, loadError, onViewRoute, onBack, onRetry }
             Walking route computed by the pedestrian router on OpenStreetMap data.
           </p>
         </div>
+      )}
+      {detail !== null && (
+        <CircleInsight
+          insight={insight}
+          loadError={insightError}
+          requestPending={reassessmentPending}
+          overrideSaving={overrideSaving}
+          onRetry={onRetryInsight}
+          onRequestReassessment={onRequestReassessment}
+          onSaveOverride={onSaveOverride}
+        />
       )}
     </section>
   );

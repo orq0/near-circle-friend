@@ -15,6 +15,8 @@ interface RadarScreenProps {
   onRetry: () => void;
   onEnable: () => void;
   onBack: () => void;
+  onOpenReconnect: () => void;
+  onOpenAiSettings: () => void;
 }
 
 export function RadarScreen({
@@ -26,6 +28,8 @@ export function RadarScreen({
   onRetry,
   onEnable,
   onBack,
+  onOpenReconnect,
+  onOpenAiSettings,
 }: RadarScreenProps) {
   return (
     <section className="screen" aria-label="Near-Circle radar">
@@ -114,6 +118,14 @@ export function RadarScreen({
         Dots show real PostGIS distance and bearing around Metro Manila demo
         locations. Simulated identities; genuine proximity math.
       </p>
+      <div className="insight-actions">
+        <button type="button" className="secondary-cta" onClick={onOpenReconnect}>
+          Reconnect today
+        </button>
+        <button type="button" className="secondary-cta" onClick={onOpenAiSettings}>
+          AI Circle settings
+        </button>
+      </div>
     </section>
   );
 }
