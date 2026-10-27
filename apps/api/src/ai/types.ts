@@ -25,6 +25,8 @@ export const MODEL_ID = 'muse-spark-1.3';
 export const MODEL_BASE_URL = 'https://api.meta.ai/v1';
 export const POLICY_VERSION = '1.0';
 
+export type ReasoningEffort = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+
 export interface AiCircleConfig {
   enabled: boolean;
   demoMode: boolean;
@@ -33,6 +35,7 @@ export interface AiCircleConfig {
   apiKey: string;
   timeoutMs: number;
   maxOutputTokens: number;
+  reasoningEffort: ReasoningEffort;
   cooldownDays: number;
   userRefreshPerDay: number;
   adviceTtlMin: number;
@@ -48,7 +51,11 @@ export const DEFAULT_AI_CIRCLE_CONFIG: AiCircleConfig = {
   baseUrl: MODEL_BASE_URL,
   apiKey: '',
   timeoutMs: 20000,
-  maxOutputTokens: 512,
+  // Budget shared by hidden reasoning + visible JSON: 512 at the model's
+  // default effort truncated real replies (finish_reason: length). Low
+  // effort plus a roomier cap leaves 10x headroom for ~200-token outputs.
+  maxOutputTokens: 2048,
+  reasoningEffort: 'low',
   cooldownDays: 14,
   userRefreshPerDay: 1,
   adviceTtlMin: 30,
@@ -72,6 +79,13 @@ function parseInt(raw: string | undefined, fallback: number, min: number): numbe
   return n;
 }
 
+const REASONING_EFFORTS: readonly ReasoningEffort[] = ['minimal', 'low', 'medium', 'high', 'xhigh'];
+
+function parseEffort(raw: string | undefined): ReasoningEffort {
+  const v = raw?.trim().toLowerCase();
+  return REASONING_EFFORTS.includes(v as ReasoningEffort) ? (v as ReasoningEffort) : 'low';
+}
+
 export function readAiCircleConfig(env: NodeJS.ProcessEnv = process.env): AiCircleConfig {
   return {
     enabled: parseBool(env['AI_CIRCLE_ENABLED'], DEFAULT_AI_CIRCLE_CONFIG.enabled),
@@ -85,6 +99,7 @@ export function readAiCircleConfig(env: NodeJS.ProcessEnv = process.env): AiCirc
       DEFAULT_AI_CIRCLE_CONFIG.maxOutputTokens,
       64,
     ),
+    reasoningEffort: parseEffort(env['AI_CIRCLE_REASONING_EFFORT']),
     cooldownDays: parseInt(
       env['AI_CIRCLE_COOLDOWN_DAYS'],
       DEFAULT_AI_CIRCLE_CONFIG.cooldownDays,

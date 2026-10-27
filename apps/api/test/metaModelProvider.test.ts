@@ -71,7 +71,7 @@ describe('Meta Model API adapter', () => {
     });
     const result = await provider.assessFriendship(ASSESS_INPUT);
     expect(result.output.closeness_level).toBe(4);
-    expect(result.usage).toEqual({ inputTokens: 120, outputTokens: 40 });
+    expect(result.usage).toEqual({ inputTokens: 120, outputTokens: 40, reasoningTokens: 0 });
     expect(result.modelId).toBe('muse-spark-1.3');
     expect(seen).toHaveLength(1);
     expect(seen[0]?.url).toBe('https://api.meta.ai/v1/chat/completions');
@@ -86,6 +86,9 @@ describe('Meta Model API adapter', () => {
     expect(jsonSchema['strict']).toBe(true);
     const assessSchema = jsonSchema['schema'] as { required: string[]; properties: Record<string, unknown> };
     expect(assessSchema.required).toContain('reassessment_note');
+    expect(body['max_completion_tokens']).toBe(2048);
+    expect(body['max_tokens']).toBeUndefined();
+    expect(body['reasoning_effort']).toBe('low');
     expect(seen[0]?.init.headers['authorization']).toBe('Bearer test-key');
     expect(JSON.stringify(body)).not.toContain('test-key');
   });
@@ -235,6 +238,72 @@ describe('Meta Model API adapter', () => {
     } catch (err) {
       expect(isTransientModelError(err)).toBe(false);
     }
+  });
+
+  // Live failure (debug-8): the model spent the whole completion budget on
+  // hidden reasoning and stopped with finish_reason "length"; content came
+  // back null. That must surface as an explicit truncation, never as an
+  // ordinary "invalid response", and must not be retried as transient.
+  it('reports finish_reason length as an explicit truncation', async () => {
+    const truncated = {
+      choices: [{ message: { role: 'assistant', content: null }, finish_reason: 'length' }],
+      usage: {
+        prompt_tokens: 140,
+        completion_tokens: 512,
+        completion_tokens_details: { reasoning_tokens: 509 },
+      },
+    };
+    for (const payload of [
+      truncated,
+      {
+        choices: [
+          {
+            message: { role: 'assistant', content: '{"opportunity":"suggest",' },
+            finish_reason: 'length',
+          },
+        ],
+        usage: truncated.usage,
+      },
+    ]) {
+      const provider = createMetaModelProvider({ config: CONFIG, fetchFn: jsonFetch(payload) });
+      try {
+        await provider.adviseMeetup(ADVISE_INPUT);
+        expect.unreachable('expected truncation');
+      } catch (err) {
+        expect((err as { statusCode?: number }).statusCode).toBe(502);
+        expect((err as Error).message).toBe('ai provider response truncated');
+        expect(isTransientModelError(err)).toBe(false);
+      }
+    }
+
+    // Reasoning-token attribution is parsed for budgets/logging.
+    const ok = createMetaModelProvider({
+      config: CONFIG,
+      fetchFn: jsonFetch({
+        choices: [
+          {
+            message: {
+              role: 'assistant',
+              content: JSON.stringify({
+                opportunity: 'suggest',
+                opportunity_reason: 'Nearby and available.',
+                activity: 'coffee',
+                invitation_draft: 'Coffee today?',
+              }),
+            },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: {
+          prompt_tokens: 140,
+          completion_tokens: 320,
+          completion_tokens_details: { reasoning_tokens: 260 },
+        },
+      }),
+    });
+    const result = await ok.adviseMeetup(ADVISE_INPUT);
+    expect(result.output.opportunity).toBe('suggest');
+    expect(result.usage).toEqual({ inputTokens: 140, outputTokens: 320, reasoningTokens: 260 });
   });
 
   it('rejects malformed envelopes and invalid model JSON with 502', async () => {

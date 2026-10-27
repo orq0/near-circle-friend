@@ -424,7 +424,7 @@ export function createCountingProvider(overrides: {
           activity_trend: 'stable',
           reassessment_note: null,
         });
-      return { output: output as never, usage: { inputTokens: 120, outputTokens: 40 }, modelId: 'muse-spark-1.3' };
+      return { output: output as never, usage: { inputTokens: 120, outputTokens: 40, reasoningTokens: 0 }, modelId: 'muse-spark-1.3' };
     },
     async adviseMeetup(input: AdviseModelInput) {
       calls.advise.push(input);
@@ -437,7 +437,7 @@ export function createCountingProvider(overrides: {
           activity: 'coffee',
           invitation_draft: 'Hey! Coffee today? No pressure!',
         });
-      return { output: output as never, usage: { inputTokens: 150, outputTokens: 60 }, modelId: 'muse-spark-1.3' };
+      return { output: output as never, usage: { inputTokens: 150, outputTokens: 60, reasoningTokens: 0 }, modelId: 'muse-spark-1.3' };
     },
   };
 }
