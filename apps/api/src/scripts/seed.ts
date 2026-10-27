@@ -14,6 +14,7 @@ const FILES = [
   'db/init/03-ai-circle.sql',
   'db/seed/phase2-demo.sql',
   'db/seed/ai-demo.sql',
+  'db/seed/reconnect-demo.sql',
 ];
 
 async function main(): Promise<void> {

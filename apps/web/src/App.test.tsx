@@ -436,6 +436,84 @@ describe('Near-Circle Phase 2 UI', () => {
     expect(screen.queryByRole('button', { name: 'Ask Meta AI' })).not.toBeInTheDocument();
   });
 
+  it('shows eligible Rhea and Nicole panels in Reconnect today without asking AI', async () => {
+    const requested: string[] = [];
+    installFetch(
+      {
+        opportunities: {
+          ai_enabled: true,
+          radius_m: 5000,
+          candidates: [
+            {
+              id: 'nicole',
+              display_name: 'Nicole',
+              distance_m: 2476.4,
+              bearing_deg: 195.4,
+              walk_minutes: 35,
+              closeness: { level: 4, level_source: 'demo_profile' },
+              context: 'Nearby and available for discovery',
+            },
+            {
+              id: 'rhea',
+              display_name: 'Rhea',
+              distance_m: 3201.3,
+              bearing_deg: 10,
+              walk_minutes: 47,
+              closeness: { level: 3, level_source: 'demo_profile' },
+              context: 'Nearby and available for discovery',
+            },
+          ],
+        },
+      },
+      requested,
+    );
+    render(<App />);
+    await screen.findByText('Chats');
+    fireEvent.click(screen.getByRole('button', { name: 'Open Near-Circle' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Reconnect today' }));
+    expect(await screen.findByRole('heading', { name: 'Reconnect today' })).toBeInTheDocument();
+    expect(screen.getByText('Rhea', { selector: 'h3' })).toBeInTheDocument();
+    expect(screen.getByText('Nicole', { selector: 'h3' })).toBeInTheDocument();
+    expect(screen.getByText(/Tier 3/)).toBeInTheDocument();
+    expect(screen.getByText(/Tier 4/)).toBeInTheDocument();
+    // Browsing candidates never triggers inference; only Ask does.
+    expect(requested.some((entry) => entry.includes('/advise'))).toBe(false);
+    expect(screen.getAllByRole('button', { name: 'Ask Meta AI' })).toHaveLength(2);
+  });
+
+  it('fetches reconnect candidates at the shared radar radius', async () => {
+    const requested: string[] = [];
+    installFetch({}, requested);
+    render(<App />);
+    await screen.findByText('Chats');
+    fireEvent.click(screen.getByRole('button', { name: 'Open Near-Circle' }));
+    await screen.findByRole('button', { name: 'Select Coleen' });
+    fireEvent.click(screen.getByRole('button', { name: '5 km' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Reconnect today' }));
+    expect(await screen.findByRole('heading', { name: 'Reconnect today' })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(requested.includes('GET /api/ai-circle/opportunities?radius_m=5000')).toBe(true);
+    });
+  });
+
+  it('keeps the radius synchronized between radar and reconnect', async () => {
+    const requested: string[] = [];
+    installFetch({}, requested);
+    render(<App />);
+    await screen.findByText('Chats');
+    fireEvent.click(screen.getByRole('button', { name: 'Open Near-Circle' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Reconnect today' }));
+    expect(await screen.findByRole('heading', { name: 'Reconnect today' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '2 km' }));
+    await waitFor(() => {
+      expect(requested.includes('GET /api/ai-circle/opportunities?radius_m=2000')).toBe(true);
+    });
+    fireEvent.click(screen.getByRole('button', { name: '← Back' }));
+    expect(await screen.findByRole('button', { name: 'Select Coleen' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '2 km' })).toHaveAttribute('aria-pressed', 'true');
+    expect(requested.includes('GET /api/friends/nearby?radius_m=2000')).toBe(true);
+  });
+
   it('opens AI settings and saves a consent change', async () => {
     const requested: string[] = [];
     installFetch({}, requested);
