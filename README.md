@@ -1,128 +1,157 @@
-# Near-Circle-Friend
+# Near-Circle-Friend aka Ni-Ce-Friend
 
-**Proposed Facebook Messenger Feature | Meta Global AI Hackathon | Phase 1**
+**Proposed Facebook Messenger Feature • Meta Global AI Hackathon 2026**
 
-Near-Circle is a proposed **proximity-based friend discovery feature for Facebook Messenger**. It would allow friends who explicitly opt in to discover one another within a configurable geographic radius using an interactive radar, select an eligible friend, and view a real walking route with estimated travel time and step count.
+*Discover nearby friends. Reconnect in real life.*
 
-The hackathon implementation is a **standalone proof of concept** designed to demonstrate how Near-Circle could work as a future Messenger feature. Its Messenger-inspired interface, demo identities, conversations, and friend relationships are simulated. Geospatial discovery, permission-aware routing, and Meta AI integration will be implemented in their respective development phases.
+Near-Circle-Friend, also known as **Ni-Ce-Friend**, is a proximity-based social discovery application demonstrating how Facebook Messenger could help friends reconnect in the real world. Its Messenger-inspired interface combines an interactive proximity radar, geospatial discovery powered by PostgreSQL/PostGIS, and pedestrian navigation using OSRM and OpenStreetMap.
 
-> **Project status:** This is a proposal, not an officially released, endorsed, or integrated Facebook Messenger feature. Phase 1 does not access Facebook friends or messages, and it does not use the Meta Graph API. Any future integration would depend on the relevant platform APIs, permissions, and approvals.
+Users can discover nearby participating friends, explore their proximity on the **Near-Circle** radar, and view actual walking routes with estimated travel times and step counts.
 
-**Project references:** [`Near-Circle_Dev_Plan.md`](./Near-Circle_Dev_Plan.md) is the authoritative technical specification; [`Near-Circle_Dev_Plan_visual.pdf`](./Near-Circle_Dev_Plan_visual.pdf) is the visual and UX reference. If they conflict technically, the Markdown specification takes precedence.
+Ni-Ce-Friend is an independent concept prototype developed for the Meta Global AI Hackathon 2026. It is not an officially released, endorsed, or integrated Facebook or Messenger feature.
 
-## Services
+## Project Overview
 
-| Service | Stack | Default URL / status |
-|---|---|---|
-| Web (`near-circle-web`) | React + Vite + TypeScript | http://localhost:5173/ |
-| API (`near-circle-api`) | Fastify + TypeScript | http://localhost:3001/health |
-| Database (`near-circle-db`) | PostgreSQL 16 + PostGIS 3.4 | `localhost:5433` |
-| Walking router (`near-circle-routing-walk`) | OSRM foot profile, `routing` Compose profile | Phase 1: off until graph prepared |
-| Map tiles | External OSM-compatible provider | Configurable URL; not a local container |
+| | |
+|---|---|
+| Official project identity | Near-Circle-Friend aka Ni-Ce-Friend |
+| Short product name | Ni-Ce-Friend |
+| Proximity discovery feature | Near-Circle |
+| Repository | near-circle-friend |
+| Positioning | Proposed Facebook Messenger Feature |
+| Event | Meta Global AI Hackathon 2026 |
+| Tagline | *Discover nearby friends. Reconnect in real life.* |
 
-The four local services have independent boundaries. The map tile provider is a separate external dependency by default. The routing service will use a dedicated pedestrian graph once Phase 3 is implemented.
+**Project references:** [`Near-Circle_Dev_Plan.md`](./Near-Circle_Dev_Plan.md) is the authoritative technical specification; [`Near-Circle_Dev_Plan_visual.pdf`](./Near-Circle_Dev_Plan_visual.pdf) is the visual and UX reference.
 
-## Prerequisites
+## Key Features
 
-- Windows 11, PowerShell 7 (`pwsh`), and VS Code
-- Node.js 20+ and npm
-- Docker Desktop for the Compose stack; the web and API can also run natively
+### Messenger-Inspired Experience
 
-## Quickstart
+- Familiar messaging interface with simulated conversations.
+- Functional conversation search that filters the simulated chat list.
+- A Near-Circle entry point in the inbox header, alongside the main **Open Near-Circle** action.
+- Responsive desktop and mobile presentation.
+
+### Interactive Proximity Radar
+
+- The current user sits at the center; nearby opted-in friends appear as red dots.
+- Concentric proximity rings, a configurable discovery radius (500 m / 1 km / 2 km / 5 km), and friend selection.
+- Friend dots are positioned from real geographic distance and bearing calculations.
+- Opt-in visibility controls: turning Near-Circle off pauses discovery.
+
+### Real Geospatial Discovery
+
+- PostgreSQL/PostGIS proximity queries using `ST_DWithin` over geography points.
+- Geodesic distance (`ST_Distance`) and bearing (`ST_Azimuth`) calculations with spatial indexing.
+- Friend-relationship eligibility filtering: only approved, opted-in friends with fresh locations are returned.
+- A simulated Metro Manila demo dataset (identities and conversations are fictional; the geospatial math is real).
+
+### Pedestrian Navigation
+
+- OSRM pedestrian (foot profile) routing over a Metro Manila OpenStreetMap graph.
+- Interactive Leaflet map rendering the actual route geometry.
+- Walking distance, estimated duration, and estimated step counts from a configurable stride.
+- On-foot distance is always shown alongside the straight-line distance — never conflated.
+
+## Application Screenshots
+
+Screenshots are captured from the running application at 1440 × 900. Start the stack (see below), open <http://localhost:5173>, and save the four views into `docs/screenshots/`:
+
+| File | What it shows |
+|---|---|
+| `docs/screenshots/messenger-inbox.png` | Messenger-inspired inbox: conversation list, search, avatars, Near-Circle entry point |
+| `docs/screenshots/near-circle-radar.png` | Near-Circle radar: you at center, red friend dots, radius selector |
+| `docs/screenshots/friend-details.png` | Selected friend with proximity distance and walking-route action |
+| `docs/screenshots/walking-route.png` | OpenStreetMap with the real OSRM route, distance, ETA, and steps |
+
+<!--
+Once the four PNGs exist in docs/screenshots/, the GitHub gallery is:
+![Ni-Ce-Friend Messenger Interface](docs/screenshots/messenger-inbox.png)
+![Ni-Ce-Friend Near-Circle Radar](docs/screenshots/near-circle-radar.png)
+![Ni-Ce-Friend Friend Details](docs/screenshots/friend-details.png)
+![Ni-Ce-Friend Walking Route](docs/screenshots/walking-route.png)
+-->
+
+## How Ni-Ce-Friend Works
+
+1. The Messenger-inspired frontend (`apps/web`) calls the Fastify API (`apps/api`).
+2. For discovery, the API runs PostGIS queries in PostgreSQL: it computes the demo user's position, finds approved friends with Near-Circle enabled and fresh locations within the radius, and returns each friend's distance and bearing.
+3. The frontend places those friends as dots on the Near-Circle radar.
+4. When a friend is selected, the API asks the OSRM pedestrian router for a walking route over the Metro Manila road/walkway network and returns the route geometry, distance, and duration.
+5. Leaflet renders the route on OpenStreetMap; the UI adds estimated steps (distance ÷ stride) and compares walking distance with the straight line.
+
+## Technical Architecture
+
+| Component | Technology |
+|---|---|
+| Frontend | React 19, TypeScript, Vite |
+| Backend | Fastify, TypeScript |
+| Database | PostgreSQL 16 |
+| Geospatial engine | PostGIS 3.4 |
+| Pedestrian routing | OSRM (foot profile) |
+| Map rendering | Leaflet |
+| Map data | OpenStreetMap |
+| Infrastructure | Docker Compose |
+
+```mermaid
+flowchart LR
+    subgraph Client["Browser"]
+        UI["Messenger-inspired frontend<br/>(React + Vite)"]
+        MAP["Leaflet map<br/>(OpenStreetMap tiles)"]
+    end
+    subgraph Services["Docker Compose stack"]
+        API["Fastify API"]
+        DB[("PostgreSQL + PostGIS")]
+        OSRM["OSRM pedestrian router<br/>(foot profile, Metro Manila graph)"]
+    end
+    UI -->|"/api (Vite proxy)"| API
+    API -->|"proximity: ST_DWithin / ST_Distance / ST_Azimuth"| DB
+    API -->|"walking route"| OSRM
+    API -->|"route geometry, distance, duration"| UI
+    MAP --- UI
+```
+
+- **PostGIS** determines which eligible friends are nearby.
+- **OSRM** calculates pedestrian routes over actual road and walkway networks.
+- **Leaflet** visualizes routes on OpenStreetMap.
+- The **frontend** presents discovery and navigation through a Messenger-inspired interface.
+
+Near-Circle is self-contained: it does not depend on unrelated repositories or routing services.
+
+## Installation and Setup
+
+### Prerequisites
+
+- Windows 11 with PowerShell 7 (`pwsh`) or Windows PowerShell 5.1.
+- Node.js 20+ and npm.
+- Docker Desktop (for the Compose stack; the web and API can also run natively).
+
+### Quickstart
 
 ```powershell
-# 1. Environment (optional overrides)
+git clone https://github.com/siamlabs/near-circle-friend.git
+cd near-circle-friend
+
+# Optional environment overrides (defaults already work)
 Copy-Item .env.example .env
 
-# 2. Dependencies
+# Dependencies
 npm install
 
-# 3. Start the implemented project services
+# Seed the Metro Manila demo dataset into the database (idempotent)
+npm run db:seed
+
+# Start the project services
 npm run startall
 
-# 4. Open the app
+# Open the app
 # http://localhost:5173/
 ```
 
-Other commands:
+### One-time pedestrian graph bootstrap
 
-```powershell
-npm run status     # Read-only health of every service
-npm run stopall    # Stop project services only; preserve data and graphs
-```
-
-Native development fallback (no Docker required for the web and API):
-
-```powershell
-npm run dev:api    # Fastify with reload: http://localhost:3001
-npm run dev:web    # Vite with HMR: http://localhost:5173
-```
-
-Checks:
-
-```powershell
-npm run typecheck
-npm run build
-npm run test
-npm run db:seed    # Metro Manila demo dataset (idempotent)
-```
-
-## Proposed four-screen Messenger experience
-
-This sequence illustrates the proposed feature's user journey. **In Phase 1, the interface is a simulated preview; the geospatial and routing functions are not yet live.**
-
-1. **Inbox** — Messenger-inspired mock conversations (Coleen / Online, Alex / Last seen recently, Sam / Chat available), an **Open Near-Circle** button, and a visibility toggle.
-2. **Radar** — The user appears at the center, with tappable friend dots around them. Phase 1 provides the preview layout; live PostGIS-based positioning arrives in Phase 2.
-3. **Friend selected** — A friend information panel displays identity, simulated visibility/consent state, and **View walking route**. Real authorization enforcement will be implemented in later phases.
-4. **Route + steps** — A screen reserved for pedestrian directions, ETA, and estimated step count. Real OSRM pedestrian routing and step calculations arrive in Phase 3; the Phase 1 screen clearly identifies placeholder data.
-
-### Intended feature behavior
-
-When implemented, Nearby discovery should return only eligible, opted-in friends within the chosen radius. Selecting a friend must trigger a fresh permission check before revealing an authorized walking route. Neither simulated locations nor demo friend records should be represented as data retrieved from Facebook.
-
-## Phase 2 — Proximity discovery (implemented)
-
-The radar is live: real PostGIS `ST_DWithin` queries over a deterministic Metro Manila demo dataset (all identities and coordinates simulated). Friend dots are positioned from computed distance and bearing, and the radius selector (500 m / 1 km / 2 km / 5 km) changes discovery results.
-
-### Demo data
-
-```powershell
-npm run db:seed   # idempotent; safe to re-run, never deletes data
-```
-
-The seed creates demo user `you` near Rizal Park plus friends covering every eligibility case: in and out of range, disabled, stale, beyond 5 km, non-friend, and pending. Expected discovery: 500 m → Coleen; 1 km → + Alex; 2 km → + Sam; 5 km → + Rhea.
-
-### API endpoints
-
-| Endpoint | Purpose |
-|---|---|
-| `GET /friends/nearby?radius_m=1000` | Eligible nearby friends with distance and bearing |
-| `GET /near-circle/visibility` | Activation state |
-| `PUT /near-circle/visibility` | Enable/disable (+ optional radius) |
-| `POST /near-circle/toggle` | Enable/disable alias |
-| `PUT /location` | Move the demo user (simulated) |
-| `GET /friends` | Approved friends with Near-Circle/location status |
-| `GET /friends/:id` | Permitted detail; proximity only when discoverable |
-
-The demo context is the local user `you`; no authentication system is introduced.
-
-### Demonstration
-
-1. Run `npm run db:seed` and open http://localhost:5173/.
-2. Open Near-Circle → the radar shows Coleen at ~280 m.
-3. Switch the radius to 5 km → Alex, Sam, and Rhea appear.
-4. Select a dot → detail with the real distance; **View walking route** leads to the Phase 3 stub (no fabricated routes).
-5. Toggle Near-Circle off → the radar pauses discovery.
-
-Live-database integration tests: `$env:RUN_INTEGRATION_TESTS='1'; npm --workspace apps/api run test:integration`.
-
-## Phase 3 — Pedestrian routing (implemented; graph bootstrap required)
-
-Walking routes are computed by a project-owned OSRM foot-profile service over a Metro Manila extract. The API serves validated route geometry through `GET /friends/:id/route`; the UI renders it on an interactive OpenStreetMap with distance, walk time, and estimated steps, always distinguishing on-foot distance from the straight line.
-
-### One-time graph bootstrap
-
-Requires Docker with ~2 GB free. Port 5002 must be free (5001 is reserved for the unrelated instance already there).
+The router is gated behind the `routing` Compose profile until its graph is prepared. This takes a few minutes and ~2 GB of disk (the Manila PBF is downloaded once into `routing/data/`, validated, and reused on later runs):
 
 ```powershell
 pwsh -NoProfile -ExecutionPolicy Bypass -File ./routing/prepare-graph.ps1
@@ -130,51 +159,121 @@ npm run startall   # routing profile enables automatically once the graph exists
 npm run status     # expect near-circle-routing-walk: healthy
 ```
 
-Details, data provenance (© OpenStreetMap contributors, ODbL), and the direct API test live in [`routing/README.md`](./routing/README.md).
+Data provenance: Metro Manila extract from BBBike (© OpenStreetMap contributors, ODbL). See [`routing/README.md`](./routing/README.md) for details, the direct API test, and the Geofabrik fallback.
 
-### Notes
+## Running the Application
 
-- Native API development needs `ROUTING_WALK_URL=http://localhost:5002` (the in-Compose default only resolves inside Docker).
-- Until the bootstrap runs, the route screen honestly reports unavailability; nothing fabricates geometry.
-- Step counts are labeled estimates from the configured stride (default 0.75 m).
+| Command | Effect |
+|---|---|
+| `npm run startall` | Start the Compose stack and wait for real readiness; enables the routing profile automatically once the graph exists |
+| `npm run status` | Read-only health of every service (never prints secrets) |
+| `npm run stopall` | Stop project services only; preserves data and graphs |
+| `npm run dev:api` | Native fallback: Fastify with reload on <http://localhost:3001> |
+| `npm run dev:web` | Native fallback: Vite with HMR on <http://localhost:5173> |
 
-## Project structure
+Default URLs: web <http://localhost:5173/>, API health <http://localhost:3001/health>, router <http://localhost:5002>, PostgreSQL `localhost:5433`.
+
+## Demo Walkthrough
+
+For hackathon judges — helping friends reconnect through proximity-aware social discovery:
+
+1. Open Ni-Ce-Friend's Messenger-inspired interface at <http://localhost:5173>.
+2. Browse the simulated conversations (Coleen, Alex, Sam).
+3. Launch **Near-Circle** from the header or the **Open Near-Circle** button.
+4. Make sure proximity discovery is activated (the visibility toggle in the inbox).
+5. Watch nearby friends appear as red dots on the radar — Coleen at ~280 m at the default 1 km radius.
+6. Adjust the discovery radius (500 m → 1 km → 2 km → 5 km) and watch dots appear (Alex, Sam, then Rhea).
+7. Select a nearby friend dot.
+8. Review the proximity information (real computed distance).
+9. Open **View walking route** for pedestrian navigation.
+10. See the real OSRM walking route on OpenStreetMap with distance, ETA, and estimated steps.
+11. Return to the radar or the Messenger inbox with the back controls.
+
+## API Endpoints
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /health` | Service health |
+| `GET /friends/nearby?radius_m=1000` | Eligible nearby friends with distance and bearing |
+| `GET /near-circle/visibility` | Activation state |
+| `PUT /near-circle/visibility` | Enable/disable (+ optional radius) |
+| `POST /near-circle/toggle` | Enable/disable alias |
+| `PUT /location` | Move the demo user (simulated) |
+| `GET /friends` | Approved friends with Near-Circle/location status |
+| `GET /friends/:id` | Friend detail; proximity only when discoverable |
+| `GET /friends/:id/route` | Pedestrian route (geometry, distance, duration, steps) |
+
+## Project Structure
 
 ```text
-apps/web/          # React + Vite + TS prototype UI (mock data in src/mockData.ts)
-apps/api/          # Fastify API: health, demo friends, nearby/visibility/location/friends (PostGIS)
-db/init/           # PostGIS extension + foundation schema
+apps/web/          # React + Vite + TS Messenger-inspired UI (mock conversations in src/mockData.ts)
+apps/api/          # Fastify API: health, nearby/visibility/location/friends/route (PostGIS + OSRM)
+db/init/           # PostGIS extension + schema
 db/seed/           # Idempotent Metro Manila demo dataset (npm run db:seed)
-routing/           # OSRM service boundary: README + data/ for the Phase 3 graph
+routing/           # OSRM boundary: README, data/ (graph artifacts), prepare-graph.ps1
 scripts/           # startall.ps1 / stopall.ps1 / status.ps1 (+ common.ps1)
+docs/              # Specs and screenshots
 docker-compose.yml # Four project-owned services
 ```
 
-## Environment
+## Testing and Verification
 
-See [`.env.example`](./.env.example). Ports, credentials, routing endpoints, and map-tile URLs are configurable. `startall` and `status` must not print secrets.
+```powershell
+npm run typecheck   # TypeScript across API and web workspaces
+npm run build       # Type-check + production builds
+npm test            # Unit tests (API and web)
+```
+
+Live integration tests (require a seeded stack and, for routing, the prepared graph):
+
+```powershell
+npm run db:seed
+$env:RUN_INTEGRATION_TESTS='1'; npm --workspace apps/api run test:integration   # 6 PostGIS + 1 routing
+```
+
+See [`.env.example`](./.env.example) for configurable ports, credentials, routing endpoints, and map-tile URLs.
+
+## Known Limitations
+
+- All identities, conversations, friendships, and demo locations are simulated. There is no Facebook login, no real friend graph, and no real messaging.
+- The demo context is a single local user (`you` near Rizal Park); there is no authentication system.
+- Walking routes require the one-time graph bootstrap above; before it, the route screen honestly reports unavailability rather than fabricating geometry.
+- Step counts are estimates from walking distance and a configurable stride (default 0.75 m), not measured steps.
+- Map tiles come from an external OSM-compatible provider, not from a local container.
+- Location freshness is demo-driven (30-day window); consent checks are enforced in the API but there is no real account system behind them.
+
+## Hackathon Development and Attribution
+
+- **Near-Circle-Friend aka Ni-Ce-Friend** is an independent hackathon project built for the Meta Global AI Hackathon 2026. The proposed Messenger integration is conceptual; this is not an officially released Facebook or Messenger feature, and no Meta endorsement is claimed.
+- Social identities, conversations, and friendships in the demo are simulated. Proximity detection uses actual PostgreSQL/PostGIS computations; pedestrian navigation uses actual OSRM routing over OpenStreetMap data.
+- Map data © OpenStreetMap contributors, available under the [ODbL](https://www.openstreetmap.org/copyright). The Metro Manila extract is sourced from BBBike; see [`routing/README.md`](./routing/README.md) for provenance and the fallback source.
+- The project was developed across phases: (1) Messenger-inspired foundation and stack, (2) live PostGIS proximity radar, (3) OSRM pedestrian routing, (4) Messenger-fidelity presentation. Phases in progress: API hardening/validation, and submission packaging.
+- Any future integration with Facebook platforms would depend on the relevant APIs, permissions, and approvals.
+
+## Future Development
+
+### AI-Powered Friendship Compass (proposed)
+
+A proposed Meta AI capability that estimates friendship closeness from authorized interaction signals:
+
+- Analyze consented interaction histories (initially simulated for the prototype).
+- Estimate friendship-affinity levels from interaction frequency, recency, and reciprocity.
+- Combine friendship affinity with walking proximity.
+- Generate contextual meetup suggestions.
+
+Meta AI cannot freely access private Messenger conversations or complete Facebook friendship data; this is future functionality, not implemented in the prototype.
+
+### Additional Planned Features
+
+- Approved Facebook authentication and permitted platform integration.
+- Mutual meetup invitations and enhanced location-sharing controls.
+- Improved walking-time predictions and additional geographic coverage.
+- Hardened API validation, permission enforcement, and lifecycle coverage.
 
 ## Troubleshooting
 
+- **Router shows `not-ready`:** Expected until the graph bootstrap has run; core services start without OSRM. See the bootstrap section above.
 - **Docker missing:** `startall` reports an actionable error; use `npm run dev:api` and `npm run dev:web` for native web/API development.
-- **Port conflict:** Configure `WEB_PORT`, `API_PORT`, `POSTGRES_PORT`, or `ROUTING_WALK_PORT` in `.env`.
-- **Router shows `not-ready`:** Expected in Phase 1. The service sits behind the `routing` Compose profile and starts only after the Phase 3 graph bootstrap prepares the `routing/data/near-circle.osrm.*` file set. Core `up` never pulls the OSRM image. See [`routing/README.md`](./routing/README.md).
+- **Port conflict:** Configure `WEB_PORT`, `API_PORT`, `POSTGRES_PORT`, or `ROUTING_WALK_PORT` in `.env`. Port 5001 is avoided deliberately (commonly occupied by unrelated OSRM instances); the project router uses 5002.
 - **npm `EPERM` on cache (locked-down profiles):** Run `$env:npm_config_cache = "$PWD\.npm-cache"; npm install`.
-- **Tile outage:** Map tiles are provided externally. `status` may report their availability as `unknown`, and the app must not misrepresent unavailable route functionality as working.
-
-## Development phases
-
-| Phase | Scope | Current status |
-|---|---|---|
-| **1 — Foundation** | Mock Messenger UI, API skeleton, PostGIS infrastructure, OSRM service boundary, unified launcher | In progress / verify against tests |
-| **2 — Proximity discovery** | Real PostGIS radius queries, friend eligibility, and radar positioning | Implemented |
-| **3 — Walking routes** | Dedicated pedestrian OSRM graph, street-map overlay, ETA, and step estimation | Implemented (graph bootstrap required) |
-| **4 — API validation** | Strict schemas, permission enforcement, location freshness, security and lifecycle tests | Planned |
-| **5 — Meta AI** | Real Meta Model API-powered meetup assistance | Planned |
-| **6 — Submission** | Optional approved Facebook Login integration, demo evidence, public repository, and provenance | Planned |
-
-## Hackathon demonstration and future integration
-
-The objective is to **demonstrate a feature concept for the Facebook ecosystem**, not to launch a competing messaging service. The prototype intentionally uses simulated Facebook-like identities and relationships so the proposed experience can be evaluated without requiring live Facebook account or friend-list access.
-
-The project must clearly distinguish **working backend functionality** from **simulated UI/social data**, attribute OpenStreetMap data appropriately, and document which work was created during the hackathon. Integration into an actual Facebook or Messenger product would require Meta's participation and any applicable technical and platform approvals.
+- **Tile outage:** Map tiles are external; `npm run status` reports their reachability as `unknown` when offline, and the app never misrepresents unavailable routing as working.
