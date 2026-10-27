@@ -11,7 +11,9 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..
 const FILES = [
   'db/init/01-extensions.sql',
   'db/init/02-schema.sql',
+  'db/init/03-ai-circle.sql',
   'db/seed/phase2-demo.sql',
+  'db/seed/ai-demo.sql',
 ];
 
 async function main(): Promise<void> {
