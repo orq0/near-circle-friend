@@ -11,19 +11,19 @@ export const DEMO_NOTICE =
 // content; the demo sends nothing anywhere.
 export const MOCK_THREADS: Record<string, ChatMessage[]> = {
   coleen: [
-    { from: 'them', text: 'Hey! Are we still on for Saturday?' },
-    { from: 'you', text: 'Yes! Meeting at the park entrance at 4.' },
-    { from: 'them', text: 'Perfect, see you there!' },
+    { from: 'them', text: 'Hey! Are we still on for Saturday?', time: '2:41 PM' },
+    { from: 'you', text: 'Yes! Meeting at the park entrance at 4.', time: '2:43 PM' },
+    { from: 'them', text: 'Perfect, see you there!', time: '2:45 PM' },
   ],
   alex: [
-    { from: 'them', text: 'Sent you a photo from the park.' },
-    { from: 'you', text: 'Great shot! The light is perfect today.' },
-    { from: 'them', text: 'Right? We should walk here this weekend.' },
+    { from: 'them', text: 'Sent you a photo from the park.', time: '1:12 PM' },
+    { from: 'you', text: 'Great shot! The light is perfect today.', time: '1:15 PM' },
+    { from: 'them', text: 'Right? We should walk here this weekend.', time: '1:16 PM' },
   ],
   sam: [
-    { from: 'them', text: 'Let me know when you are nearby!' },
-    { from: 'you', text: 'Will do — I enabled Near-Circle.' },
-    { from: 'them', text: 'Nice, I will keep an eye on the radar.' },
+    { from: 'them', text: 'Let me know when you are nearby!', time: '11:02 AM' },
+    { from: 'you', text: 'Will do — I enabled Near-Circle.', time: '11:04 AM' },
+    { from: 'them', text: 'Nice, I will keep an eye on the radar.', time: '11:05 AM' },
   ],
 };
 
@@ -35,6 +35,8 @@ export const FRIENDS: Friend[] = [
     status: 'online',
     statusLabel: 'Online',
     preview: 'Are we still on for Saturday?',
+    time: '2:45 PM',
+    unread: 2,
   },
   {
     id: 'alex',
@@ -43,6 +45,8 @@ export const FRIENDS: Friend[] = [
     status: 'recent',
     statusLabel: 'Last seen recently',
     preview: 'Sent you a photo from the park.',
+    time: '1:16 PM',
+    unread: 1,
   },
   {
     id: 'sam',
@@ -51,5 +55,6 @@ export const FRIENDS: Friend[] = [
     status: 'available',
     statusLabel: 'Chat available',
     preview: 'Let me know when you are nearby!',
+    time: '11:05 AM',
   },
 ];

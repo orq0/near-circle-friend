@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { Friend, FriendStatusInfo, VisibilityState } from '../types';
 import { DEMO_NOTICE } from '../mockData';
 import { ApiStatus } from './ApiStatus';
@@ -40,6 +41,15 @@ export function InboxScreen({
   const selected = friends.find((friend) => friend.id === selectedId) ?? friends[0];
   const statusById = new Map((friendStatus ?? []).map((entry) => [entry.id, entry]));
   const showLoadError = visibility === null && visibilityLoadError;
+  const [search, setSearch] = useState('');
+  const visibleFriends = friends.filter((friend) => {
+    const needle = search.trim().toLowerCase();
+    return (
+      needle === '' ||
+      friend.name.toLowerCase().includes(needle) ||
+      friend.preview.toLowerCase().includes(needle)
+    );
+  });
   return (
     <section className="screen messenger" aria-label="Messenger-style inbox">
       <PrototypeBanner />
@@ -47,10 +57,39 @@ export function InboxScreen({
         <div className="pane-list">
           <header className="inbox-header">
             <h1>Chats</h1>
-            <ApiStatus healthy={apiHealthy} />
+            <div className="header-actions">
+              <button
+                type="button"
+                className="nc-header-btn"
+                onClick={onOpenNearCircle}
+                aria-label="Near-Circle"
+              >
+                <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+                  <circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
+                  <circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
+                  <circle cx="12" cy="12" r="1.8" fill="currentColor" />
+                  <circle cx="16.5" cy="8.5" r="1.6" fill="#f02849" />
+                </svg>
+                Near-Circle
+              </button>
+              <ApiStatus healthy={apiHealthy} />
+            </div>
           </header>
+          <div className="search-box">
+            <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" focusable="false">
+              <circle cx="10.5" cy="10.5" r="6" fill="none" stroke="currentColor" strokeWidth="2" />
+              <path d="M15.3 15.3 20 20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+            <input
+              type="search"
+              aria-label="Search conversations"
+              placeholder="Search Messenger"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </div>
           <ul className="convo-list">
-            {friends.map((friend) => (
+            {visibleFriends.map((friend) => (
               <ConversationItem
                 key={friend.id}
                 friend={friend}
@@ -60,6 +99,11 @@ export function InboxScreen({
               />
             ))}
           </ul>
+          {visibleFriends.length === 0 && (
+            <p className="radar-state" role="status">
+              No conversations match your search.
+            </p>
+          )}
           <button
             type="button"
             className="primary-cta"

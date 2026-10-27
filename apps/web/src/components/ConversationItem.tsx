@@ -34,9 +34,17 @@ export function ConversationItem({ friend, selected, nearCircleOn, onSelect }: C
         <span className="convo-body">
           <span className="convo-top">
             <span className="convo-name">{friend.name}</span>
-            <span className={`status status-${friend.status}`}>{friend.statusLabel}</span>
+            {friend.time !== undefined && <span className="convo-time">{friend.time}</span>}
           </span>
-          <span className="convo-preview">{friend.preview}</span>
+          <span className="convo-preview-row">
+            <span className="convo-preview">{friend.preview}</span>
+            {friend.unread !== undefined && friend.unread > 0 && (
+              <span className="unread-badge" aria-label={`${friend.unread} unread messages`}>
+                {friend.unread}
+              </span>
+            )}
+          </span>
+          <span className={`status status-${friend.status}`}>{friend.statusLabel}</span>
         </span>
         {nearCircleOn === true && (
           <span className="nc-dot" title="Near-Circle enabled" aria-label={`${friend.name} has Near-Circle enabled`} />

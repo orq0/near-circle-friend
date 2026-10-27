@@ -9,11 +9,14 @@ export interface Friend {
   status: FriendStatus;
   statusLabel: string;
   preview: string;
+  time?: string;
+  unread?: number;
 }
 
 export interface ChatMessage {
   from: 'them' | 'you';
   text: string;
+  time?: string;
 }
 
 // Real proximity result from GET /friends/nearby (PostGIS distance + bearing).

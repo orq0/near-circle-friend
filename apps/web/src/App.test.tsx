@@ -97,8 +97,30 @@ describe('Near-Circle Phase 2 UI', () => {
     expect(screen.getByText('Alex')).toBeInTheDocument();
     expect(screen.getByText('Sam')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Open Near-Circle' })).toBeInTheDocument();
-    expect(screen.getByText(/Unofficial prototype/)).toBeInTheDocument();
+    expect(screen.getByText(/Proposed Facebook Messenger Feature/)).toBeInTheDocument();
     expect(screen.getByText('Hey! Are we still on for Saturday?')).toBeInTheDocument();
+  });
+
+  it('exposes the Near-Circle entry point in the inbox header', async () => {
+    installFetch();
+    render(<App />);
+    expect(await screen.findByRole('button', { name: 'Near-Circle' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Open Near-Circle' })).toBeInTheDocument();
+  });
+
+  it('filters conversations with the Messenger search box', async () => {
+    installFetch();
+    render(<App />);
+    await screen.findByText('Chats');
+    fireEvent.change(screen.getByLabelText('Search conversations'), {
+      target: { value: 'alex' },
+    });
+    expect(screen.queryByText('Sam')).not.toBeInTheDocument();
+    expect(screen.getByText('Alex')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Search conversations'), {
+      target: { value: '' },
+    });
+    expect(screen.getByText('Sam')).toBeInTheDocument();
   });
 
   it('switches conversations in the panel', async () => {

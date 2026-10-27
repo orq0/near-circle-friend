@@ -23,10 +23,12 @@ export function ConversationPanel({ friend, onBack }: ConversationPanelProps) {
         </div>
       </header>
       <div className="thread" aria-label={`Simulated conversation with ${friend.name}`}>
+        <p className="thread-separator">Today</p>
         {thread.map((msg, index) => (
-          <p key={index} className={msg.from === 'you' ? 'bubble out' : 'bubble in'}>
-            {msg.text}
-          </p>
+          <div key={index} className={msg.from === 'you' ? 'bubble-row out' : 'bubble-row in'}>
+            <p className={msg.from === 'you' ? 'bubble out' : 'bubble in'}>{msg.text}</p>
+            {msg.time !== undefined && <span className="bubble-time">{msg.time}</span>}
+          </div>
         ))}
       </div>
       <p className="thread-note">Messaging is simulated in this prototype.</p>

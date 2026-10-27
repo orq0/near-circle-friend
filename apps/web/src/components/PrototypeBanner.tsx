@@ -1,8 +1,14 @@
 export function PrototypeBanner() {
   return (
     <p className="prototype-banner" role="note">
-      Unofficial prototype — a Messenger-style concept. Not a Facebook or Messenger
-      feature.
+      <span className="banner-title">Near-Circle</span>
+      <span className="banner-sub">
+        {' '}
+        Proposed Facebook Messenger Feature • Meta Global AI Hackathon 2026
+      </span>
+      <span className="visually-hidden">
+        Unofficial concept prototype. Not a Facebook or Messenger feature.
+      </span>
     </p>
   );
 }

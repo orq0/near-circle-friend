@@ -52,7 +52,9 @@ export function FriendScreen({ detail, loadError, onViewRoute, onBack, onRetry }
           <button type="button" className="primary-cta" onClick={onViewRoute}>
             View walking route
           </button>
-          <p className="phase-note">Pedestrian routing arrives in Phase 3.</p>
+          <p className="phase-note">
+            Walking route computed by the pedestrian router on OpenStreetMap data.
+          </p>
         </div>
       )}
     </section>
