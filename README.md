@@ -159,6 +159,50 @@ npm run startall
 # http://localhost:5173/
 ```
 
+### Quick Start for Hackathon Judges
+
+One command prepares everything (prerequisites below must already be installed):
+
+```powershell
+git clone https://github.com/orq0/near-circle-friend.git
+cd near-circle-friend
+npm run start:judges
+```
+
+What the script installs and prepares automatically:
+
+- Application dependencies via `npm ci` (first run only; reused afterwards).
+- A local `.env` generated from `.env.example` when missing (an existing `.env` is never overwritten).
+- Docker images via `docker compose build` using the existing Dockerfiles.
+- Service startup via the existing Compose architecture (no volume resets, no destructive cleanup).
+- Idempotent demo seeding (`npm run db:seed`; safe to re-run, never duplicates records).
+- Readiness checks: PostgreSQL health, API `/health`, frontend reachability, and a 500 m discovery probe proving Coleen is seeded.
+
+What you must provide yourself (the script never installs or provisions these):
+
+- Node.js 20+ and npm — https://nodejs.org/
+- Docker Desktop (or Docker Engine) running — https://www.docker.com/products/docker-desktop/
+- Authorized Meta Model API access for live inference: set `MODEL_API_KEY` in `.env`. Without a key the app still starts in keyless demo mode (stored profiles plus clearly labeled demo advice; nothing is simulated as `meta_live`).
+- Optional pedestrian-routing data (see "One-time pedestrian graph bootstrap" below); routing reports `not-ready` without it and the core app is unaffected.
+
+On success the script prints the actual URLs (defaults: app http://localhost:5173/, API http://localhost:3001/health), the AI status (Configured / Not configured), and the routing status, and opens the app in your browser (best-effort).
+
+Demo in 30 seconds: open Radar → select 500 m → open Reconnect Today (Coleen appears) → select a friend dot → ask Meta AI for a meetup suggestion.
+
+Stop services any time (volumes preserved):
+
+```powershell
+npm run stopall
+```
+
+Troubleshooting:
+
+- `Docker Engine running [FAIL]` — install/start Docker Desktop, then re-run.
+- A port conflict — stop the unrelated process or set `WEB_PORT`, `API_PORT`, or `POSTGRES_PORT` in `.env`.
+- `Demo users seeded [FAIL]` — run `npm run db:seed` manually and check the API logs.
+- Live AI unavailable — set `MODEL_API_KEY` in `.env` and re-run; the app keeps working in demo mode meanwhile.
+- Repeat runs are safe: healthy services are reused, seeding is idempotent, and no volumes are ever reset.
+
 ### One-time pedestrian graph bootstrap
 
 The router is gated behind the `routing` Compose profile until its graph is prepared. This takes a few minutes and ~2 GB of disk (the Manila PBF is downloaded once into `routing/data/`, validated, and reused on later runs):
