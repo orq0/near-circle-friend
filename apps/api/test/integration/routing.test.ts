@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildApp } from '../../src/app.js';
+import { createOsrmProvider } from '../../src/routing/osrmProvider.js';
 
 // Live-router suite. Runs ONLY via `npm run test:integration` with
 // RUN_INTEGRATION_TESTS=1, and passes only after the Phase 3 graph bootstrap
@@ -11,9 +12,20 @@ if (process.env['RUN_INTEGRATION_TESTS'] !== '1') {
   );
 }
 
+// Vitest runs on the Windows host, outside the Compose network, so the
+// Docker-internal ROUTING_WALK_URL (near-circle-routing-walk:5000) does not
+// resolve here. Point the injected provider at the host-published router
+// (ROUTING_WALK_HOST_URL, default localhost:5002). The containerized API
+// keeps using ROUTING_WALK_URL via buildApp's default.
+function hostRoutingProvider() {
+  return createOsrmProvider({
+    baseUrl: process.env['ROUTING_WALK_HOST_URL'] ?? 'http://localhost:5002',
+  });
+}
+
 describe('pedestrian routing (live router)', () => {
   it('calculates a real Metro Manila walking route', async () => {
-    const app = await buildApp();
+    const app = await buildApp({ routing: hostRoutingProvider() });
     try {
       const res = await app.inject({
         method: 'GET',

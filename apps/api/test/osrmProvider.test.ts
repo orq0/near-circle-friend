@@ -52,6 +52,18 @@ describe('OSRM provider', () => {
       },
     });
     expect(await catchStatus(async () => down.route(FROM, TO))).toBe(503);
+    // Docker-internal hostname used from the host: DNS cannot resolve it.
+    // This is the exact failure the host-side integration suite produced
+    // before it was pointed at ROUTING_WALK_HOST_URL.
+    const unresolvable = createOsrmProvider({
+      baseUrl: 'http://near-circle-routing-walk:5000',
+      fetchFn: async () => {
+        throw Object.assign(new Error('getaddrinfo ENOTFOUND near-circle-routing-walk'), {
+          code: 'ENOTFOUND',
+        });
+      },
+    });
+    expect(await catchStatus(async () => unresolvable.route(FROM, TO))).toBe(503);
     const badStatus = createOsrmProvider({
       baseUrl: 'http://router:5000',
       fetchFn: jsonFetch({}, 500),
