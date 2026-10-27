@@ -1,4 +1,5 @@
 import type { Friend } from '../types';
+import { Avatar } from './Avatar';
 
 const AVATAR_HUES: Record<string, number> = {
   coleen: 210,
@@ -23,14 +24,13 @@ export function ConversationItem({ friend, selected, nearCircleOn, onSelect }: C
         aria-current={selected ? 'true' : undefined}
         onClick={() => onSelect(friend)}
       >
-        <span
-          className="avatar"
-          aria-hidden="true"
+        <Avatar
+          userId={friend.id}
+          label={friend.initial}
           style={{ backgroundColor: `hsl(${hue} 55% 88%)`, color: `hsl(${hue} 60% 28%)` }}
         >
-          {friend.initial}
           {friend.status === 'online' && <span className="presence-dot" />}
-        </span>
+        </Avatar>
         <span className="convo-body">
           <span className="convo-top">
             <span className="convo-name">{friend.name}</span>

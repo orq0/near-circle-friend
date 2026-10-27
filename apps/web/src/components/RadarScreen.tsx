@@ -2,6 +2,7 @@ import type { NearbyFriend, RadarStatus } from '../types';
 import { CURRENT_USER } from '../mockData';
 import { RADII_M, formatDistance, positionOnRadar } from '../radar';
 import { PrototypeBanner } from './PrototypeBanner';
+import { Avatar } from './Avatar';
 import { RadiusSelector } from './RadiusSelector';
 
 const RING_FRACTIONS = [0.25, 0.5, 0.75] as const;
@@ -74,7 +75,12 @@ export function RadarScreen({
                   title={`${friend.display_name} — ${formatDistance(friend.distance_m)}`}
                   onClick={() => onSelectFriend(friend)}
                 >
-                  {friend.display_name.charAt(0)}
+                  <Avatar
+                    userId={friend.id}
+                    label={friend.display_name.charAt(0)}
+                    bare
+                    photoClassName="dot-photo"
+                  />
                 </button>
               );
             })}

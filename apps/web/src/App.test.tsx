@@ -395,6 +395,16 @@ describe('Near-Circle Phase 2 UI', () => {
     expect(screen.getByText('Demo profile')).toBeInTheDocument();
   });
 
+  it('shows the friend photo on the friend card', async () => {
+    installFetch();
+    render(<App />);
+    await screen.findByText('Chats');
+    fireEvent.click(screen.getByRole('button', { name: 'Open Near-Circle' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Select Coleen' }));
+    expect(await screen.findByText('Your Circle with Coleen')).toBeInTheDocument();
+    expect(document.querySelector('img[src="/img/Coleen.jpg"]')).not.toBeNull();
+  });
+
   it('asks Meta AI for a recommendation directly from the friend card', async () => {
     const requested: string[] = [];
     installFetch({}, requested);

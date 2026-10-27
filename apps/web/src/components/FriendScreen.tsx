@@ -4,6 +4,7 @@ import type {
   OpportunityCandidate,
 } from '../types';
 import { formatDistance } from '../radar';
+import { Avatar } from './Avatar';
 import { PrototypeBanner } from './PrototypeBanner';
 import { CircleInsight } from './CircleInsight';
 import { AskAiPanel } from './AskAiPanel';
@@ -76,9 +77,11 @@ export function FriendScreen({
       )}
       {detail !== null && (
         <div className="friend-card">
-          <span className="avatar large" aria-hidden="true">
-            {detail.display_name.charAt(0)}
-          </span>
+          <Avatar
+            userId={detail.id}
+            label={detail.display_name.charAt(0)}
+            className="avatar large"
+          />
           <h2>{detail.display_name}</h2>
           <p className="enabled-line">
             <span className="enabled-dot" aria-hidden="true" />

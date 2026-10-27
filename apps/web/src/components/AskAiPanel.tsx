@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { AdviceResult, AskPanelState, OpportunityCandidate } from '../types';
 import { formatDistance } from '../radar';
 import { adviceSourceLabel, closenessSourceLabel, ModelDisclosure } from './AiProvenance';
+import { Avatar } from './Avatar';
 
 interface AskAiPanelProps {
   candidate: OpportunityCandidate;
@@ -50,8 +51,14 @@ export function AskAiPanel({
   return (
     <div className="friend-card ai-panel" aria-label={`Meetup advice for ${candidate.display_name}`}>
       <div className="ai-panel-head">
-        <div>
-          <h3>{candidate.display_name}</h3>
+        <div className="ai-panel-identity">
+          <Avatar
+            userId={candidate.id}
+            label={candidate.display_name.charAt(0)}
+            className="avatar small"
+          />
+          <div>
+            <h3>{candidate.display_name}</h3>
           <p className="proximity-line">
             About {formatDistance(candidate.distance_m)} away
             {candidate.walk_minutes !== null && ` • ~${candidate.walk_minutes} min on foot`}.
@@ -62,6 +69,7 @@ export function AskAiPanel({
               {closenessSourceLabel(candidate.closeness.level_source)})
             </p>
           )}
+          </div>
         </div>
         <div className="ai-panel-top-actions">
           <button type="button" className="secondary-cta" onClick={onSnooze}>

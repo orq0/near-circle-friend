@@ -36,6 +36,7 @@ export interface AiCircleConfig {
   timeoutMs: number;
   maxOutputTokens: number;
   reasoningEffort: ReasoningEffort;
+  demoAvailability: boolean;
   cooldownDays: number;
   userRefreshPerDay: number;
   adviceTtlMin: number;
@@ -56,6 +57,9 @@ export const DEFAULT_AI_CIRCLE_CONFIG: AiCircleConfig = {
   // effort plus a roomier cap leaves 10x headroom for ~200-token outputs.
   maxOutputTokens: 2048,
   reasoningEffort: 'low',
+  // Fictional demo availability for judging (Asia/Manila windows for the
+  // dummy roster only). Off by default; real users never see it.
+  demoAvailability: false,
   cooldownDays: 14,
   userRefreshPerDay: 1,
   adviceTtlMin: 30,
@@ -100,6 +104,10 @@ export function readAiCircleConfig(env: NodeJS.ProcessEnv = process.env): AiCirc
       64,
     ),
     reasoningEffort: parseEffort(env['AI_CIRCLE_REASONING_EFFORT']),
+    demoAvailability: parseBool(
+      env['AI_CIRCLE_DEMO_AVAILABILITY'],
+      DEFAULT_AI_CIRCLE_CONFIG.demoAvailability,
+    ),
     cooldownDays: parseInt(
       env['AI_CIRCLE_COOLDOWN_DAYS'],
       DEFAULT_AI_CIRCLE_CONFIG.cooldownDays,

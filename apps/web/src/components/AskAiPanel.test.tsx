@@ -117,4 +117,9 @@ describe('AskAiPanel', () => {
     expect(onDeclineInvite).toHaveBeenCalledTimes(1);
     expect(onOpenRoute).toHaveBeenCalledTimes(1);
   });
+
+  it('shows the candidate photo in the panel header', () => {
+    const { container } = render(<AskAiPanel {...baseProps()} />);
+    expect(container.querySelector('img[src="/img/Alex.jpg"]')).not.toBeNull();
+  });
 });

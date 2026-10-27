@@ -27,6 +27,7 @@ import {
   recordRateLimited,
   requireApprovedFriend,
 } from './aiCircle.js';
+import { getDemoAvailability } from './demoAvailability.js';
 import type { CircleModelProvider } from './metaModelProvider.js';
 import type { WalkingRoutingProvider } from '../routing/types.js';
 import {
@@ -479,6 +480,9 @@ export async function requestAdvice(
     bothSharedAvailable: facts.bothSharedAvailable,
     walkMinutes: facts.walkMinutes,
     recentInviteDeclined: facts.recentInviteDeclined,
+    // Fictional demo windows for the judging roster only; null (omitted)
+    // everywhere else, so production prompts are byte-identical.
+    demoAvailability: getDemoAvailability(config.demoAvailability, ownerId, friendId, now),
   });
   const result = await provider.adviseMeetup(input);
   // Post-inference recheck before releasing anything.

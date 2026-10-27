@@ -339,3 +339,49 @@ describe('AI feedback and dismissal', () => {
     }
   });
 });
+
+describe('demo availability wiring', () => {
+  function liveSeeds() {
+    return {
+      nearby: [ALEX_NEARBY],
+      detail: ALEX_DETAIL,
+      signals: { 'you:alex': ALEX_SIGNALS },
+      profiles: { 'you:alex': ALEX_PROFILE },
+      prefs: { you: CONSENTED, alex: CONSENTED },
+    };
+  }
+
+  it('omits demo availability from live model input by default', async () => {
+    const db = createAiFakeDb(liveSeeds());
+    const provider = createCountingProvider();
+    const app = await buildApp({ db, ai: { provider, config: CONFIG } });
+    try {
+      const res = await json(app, 'POST', '/ai-circle/opportunities/alex/advise', { radius_m: 1000 });
+      expect(res.status).toBe(200);
+      expect(provider.calls.advise).toHaveLength(1);
+      expect(provider.calls.advise[0]?.opportunity.demo_availability).toBeUndefined();
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('adds fictional windows to live model input when the demo flag is on', async () => {
+    const db = createAiFakeDb(liveSeeds());
+    const provider = createCountingProvider();
+    const app = await buildApp({
+      db,
+      ai: { provider, config: { ...CONFIG, demoAvailability: true } },
+    });
+    try {
+      const res = await json(app, 'POST', '/ai-circle/opportunities/alex/advise', { radius_m: 1000 });
+      expect(res.status).toBe(200);
+      expect(provider.calls.advise).toHaveLength(1);
+      const demo = provider.calls.advise[0]?.opportunity.demo_availability;
+      expect(demo?.overlap_minutes).toBe(90);
+      expect(demo?.target_interests).toContain('coffee');
+      expect(demo?.requester_window).toContain('Asia/Manila');
+    } finally {
+      await app.close();
+    }
+  });
+});

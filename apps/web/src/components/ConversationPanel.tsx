@@ -1,5 +1,6 @@
 import type { Friend } from '../types';
 import { MOCK_THREADS } from '../mockData';
+import { Avatar } from './Avatar';
 
 interface ConversationPanelProps {
   friend: Friend;
@@ -14,9 +15,7 @@ export function ConversationPanel({ friend, onBack }: ConversationPanelProps) {
         <button type="button" className="back-link chat-back" onClick={onBack}>
           ← Chats
         </button>
-        <span className="avatar small" aria-hidden="true">
-          {friend.initial}
-        </span>
+        <Avatar userId={friend.id} label={friend.initial} className="avatar small" />
         <div className="chat-identity">
           <span className="chat-name">{friend.name}</span>
           <span className="chat-status">{friend.statusLabel}</span>

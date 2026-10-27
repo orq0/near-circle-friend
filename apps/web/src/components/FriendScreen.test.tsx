@@ -83,4 +83,9 @@ describe('FriendScreen meetup suggestion', () => {
     render(<FriendScreen {...baseProps({ detail: null, askCandidate: null })} />);
     expect(screen.queryByText('✨ Fancy catching up today?')).not.toBeInTheDocument();
   });
+
+  it('shows the friend photo on the detail card and the suggestion panel', () => {
+    const { container } = render(<FriendScreen {...baseProps()} />);
+    expect(container.querySelectorAll('img[src="/img/Coleen.jpg"]').length).toBe(2);
+  });
 });
