@@ -387,7 +387,7 @@ describe('Near-Circle Phase 2 UI', () => {
     await screen.findByText('Chats');
     fireEvent.click(screen.getByRole('button', { name: 'Open Near-Circle' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Select Coleen' }));
-    expect(await screen.findByText('Circle Insight')).toBeInTheDocument();
+    expect(await screen.findByText('Your Circle with Coleen')).toBeInTheDocument();
     expect(screen.getByText('Close Friend')).toBeInTheDocument();
     expect(screen.getByText('Demo profile')).toBeInTheDocument();
   });

@@ -1128,6 +1128,86 @@ body {
   align-items: center;
 }
 
+.insight-empty-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.insight-how {
+  margin: 0;
+}
+
+.insight-how summary {
+  cursor: pointer;
+  color: var(--nc-blue-dark);
+  font-size: 13px;
+  font-weight: 700;
+  width: fit-content;
+}
+
+.insight-how p {
+  margin: 6px 0 0;
+}
+
+.insight-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.insight-choices-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.insight-choices [role='group'] {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tier-pick {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font: inherit;
+  font-size: 14.5px;
+  text-align: left;
+  color: var(--nc-text);
+  background: var(--nc-wash);
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 9px 12px;
+  cursor: pointer;
+}
+
+.tier-pick:hover {
+  background: var(--nc-bubble-in);
+}
+
+.tier-pick.active {
+  background: #fdf3e1;
+  font-weight: 700;
+}
+
+.tier-pick:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.tier-pick:focus-visible {
+  outline: 2px solid var(--nc-blue);
+  outline-offset: 1px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tier-pick {
+    transition: background 120ms ease;
+  }
+}
+
 .ai-panel-head {
   display: flex;
   justify-content: space-between;

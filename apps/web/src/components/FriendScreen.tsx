@@ -80,6 +80,7 @@ export function FriendScreen({
       )}
       {detail !== null && (
         <CircleInsight
+          friendName={detail.display_name}
           insight={insight}
           loadError={insightError}
           requestPending={reassessmentPending}

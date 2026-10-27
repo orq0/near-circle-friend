@@ -8,6 +8,16 @@
 --   sam    — little reliable history (persisted NULL = Not enough information)
 --   taylor — discovery opt-out (approved friendship, visibility OFF; no profile)
 --
+-- UI-refinement extension: every other eligible, visible demo friend of 'you'
+-- gets realistic synthetic signals plus a persisted demo profile, so Circle
+-- Insight renders a meaningful card instead of an empty state:
+--   coleen — inner circle (Level 5, long-standing, frequent reciprocal contact)
+--   rhea   — regular friend (Level 3, steady occasional contact over years)
+--   liza   — casual friend (Level 2, newer connection, growing recent contact)
+--   jose   — acquaintance (Level 1, brief history, single confirmed meetup)
+-- marco (visibility OFF), paolo (pending) and nina (nonfriend) intentionally
+-- keep no AI rows; sam stays the genuine insufficient-information scenario.
+--
 -- Idempotent: safe to re-run. Never deletes rows. AI profile/consent rows use
 -- ON CONFLICT DO NOTHING so live consents, assessments and overrides are never
 -- overwritten by a re-seed.
@@ -57,7 +67,15 @@ VALUES
   ('you', 'sam', NULL, NULL, 'rare',
    'unknown', NULL, 0, NULL, ARRAY[]::TEXT[], 0, 'synthetic_demo', 1),
   ('you', 'taylor', NULL, NULL, NULL,
-   'unknown', NULL, 0, NULL, ARRAY[]::TEXT[], 0, 'synthetic_demo', 1)
+   'unknown', NULL, 0, NULL, ARRAY[]::TEXT[], 0, 'synthetic_demo', 1),
+  ('you', 'coleen', 'several_years', 'about_one_month_ago', 'frequent',
+   'stable', 'balanced', 18, 'inner_circle', ARRAY['coffee', 'lunch', 'walk'], 6, 'synthetic_demo', 1),
+  ('you', 'rhea', 'several_years', 'about_three_months_ago', 'occasional',
+   'stable', 'balanced', 6, 'regular_friend', ARRAY['lunch', 'catch_up'], 3, 'synthetic_demo', 1),
+  ('you', 'liza', 'about_one_year', 'about_one_month_ago', 'occasional',
+   'increasing', 'balanced', 3, 'casual_friend', ARRAY['coffee'], 2, 'synthetic_demo', 1),
+  ('you', 'jose', 'recent_months', 'over_six_months_ago', 'rare',
+   'decreasing', 'mostly_them', 1, 'acquaintance', ARRAY[]::TEXT[], 0, 'synthetic_demo', 1)
 ON CONFLICT (owner_id, friend_id) DO NOTHING;
 
 -- Persisted fixture profiles: baseline JSON mirrors the canonical signals above.
@@ -80,6 +98,26 @@ VALUES
    'Not enough interaction history to estimate closeness.',
    'unknown', 'demo_fixture', NULL, 1, 'seed-v1',
    '{"known_for_bucket":null,"last_meetup_bucket":null,"contact_frequency":"rare","activity_trend":"unknown","reciprocity_bucket":null,"confirmed_meetups":0,"declared_closeness":null,"declared_activities":[],"sustained_windows":0}'::jsonb,
+   '1.0', 'active', NOW()),
+  ('you', 'coleen', 5, 'strong',
+   'Long-standing inner-circle friendship with frequent reciprocal contact and many confirmed meetups.',
+   'stable', 'demo_fixture', NULL, 1, 'seed-v1',
+   '{"known_for_bucket":"several_years","last_meetup_bucket":"about_one_month_ago","contact_frequency":"frequent","activity_trend":"stable","reciprocity_bucket":"balanced","confirmed_meetups":18,"declared_closeness":"inner_circle","declared_activities":["coffee","lunch","walk"],"sustained_windows":6}'::jsonb,
+   '1.0', 'active', NOW()),
+  ('you', 'rhea', 3, 'moderate',
+   'Established friendship with steady occasional contact over several years.',
+   'stable', 'demo_fixture', NULL, 1, 'seed-v1',
+   '{"known_for_bucket":"several_years","last_meetup_bucket":"about_three_months_ago","contact_frequency":"occasional","activity_trend":"stable","reciprocity_bucket":"balanced","confirmed_meetups":6,"declared_closeness":"regular_friend","declared_activities":["lunch","catch_up"],"sustained_windows":3}'::jsonb,
+   '1.0', 'active', NOW()),
+  ('you', 'liza', 2, 'moderate',
+   'Newer friendship with growing recent contact.',
+   'increasing', 'demo_fixture', NULL, 1, 'seed-v1',
+   '{"known_for_bucket":"about_one_year","last_meetup_bucket":"about_one_month_ago","contact_frequency":"occasional","activity_trend":"increasing","reciprocity_bucket":"balanced","confirmed_meetups":3,"declared_closeness":"casual_friend","declared_activities":["coffee"],"sustained_windows":2}'::jsonb,
+   '1.0', 'active', NOW()),
+  ('you', 'jose', 1, 'limited',
+   'Brief acquaintance with a single confirmed meetup and little recent contact.',
+   'decreasing', 'demo_fixture', NULL, 1, 'seed-v1',
+   '{"known_for_bucket":"recent_months","last_meetup_bucket":"over_six_months_ago","contact_frequency":"rare","activity_trend":"decreasing","reciprocity_bucket":"mostly_them","confirmed_meetups":1,"declared_closeness":"acquaintance","declared_activities":[],"sustained_windows":0}'::jsonb,
    '1.0', 'active', NOW())
 ON CONFLICT (owner_id, friend_id) DO NOTHING;
 
