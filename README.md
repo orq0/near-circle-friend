@@ -54,6 +54,15 @@ Ni-Ce-Friend is an independent concept prototype developed for the Meta Global A
 - Walking distance, estimated duration, and estimated step counts from a configurable stride.
 - On-foot distance is always shown alongside the straight-line distance — never conflated.
 
+### AI Circle Intelligence
+
+- Friendship closeness estimates from coarse, consented aggregates (tiers 1–5 plus honest "Not enough information").
+- **Circle Insight** on each friend card: level, evidence quality, rationale, trend, and provenance.
+- **Reconnect today** screen with deterministic nearby candidates and per-friend **Ask Meta AI**.
+- Editable invitation drafts that are never sent; low-pressure suggestions only.
+- Strictly opt-in: analysis and advice consents default off; revoking purges derived data.
+- Every AI surface carries an explicit provenance label — live estimate, recent result, demo profile, or your choice.
+
 ## Application Screenshots
 
 Captured from the running application (Messenger-inspired interface, live PostGIS radar, and real OSRM routing):
@@ -190,6 +199,20 @@ For hackathon judges — helping friends reconnect through proximity-aware socia
 10. See the real OSRM walking route on OpenStreetMap with distance, ETA, and estimated steps.
 11. Return to the radar or the Messenger inbox with the back controls.
 
+## AI Circle Intelligence
+
+Prototype powered by Muse Spark 1.3 via Meta Model API; proposed production integration would use native Meta AI subject to Meta's first-party approval and support.
+
+AI Circle Intelligence adds friendship closeness and low-pressure meetup guidance on top of discovery — without ever replacing the deterministic PostGIS/OSRM facts. Closeness comes from coarse consented aggregates only (known-for, recency, frequency, reciprocity, confirmed meetups, declared values). No message bodies, post text, personal identifiers beyond the demo pair, or precise locations ever reach the model: its prompts contain aliased, bucketed facts with a strict JSON contract, and every output is validated before storage or display.
+
+**Consent and honesty model.** New analysis and advice consents default off. Reassessments run only for approved initial or materially changed and consented friendships, with a 14-day cooldown, hysteresis against signal flicker, and a bounded retry budget. Advice requires advice consent, eligibility rechecks before and after inference, and per-user/per-friend rate limits. Turning consent off immediately cancels queued work and purges derived suggestions (manual tiers are never auto-replaced and survive revocation). Map, radar, and walking routes keep working when the model is unreachable.
+
+**Provenance labels.** `AI estimate` = persisted from live Muse Spark inference; `Recent AI suggestion`/`Live AI suggestion` = freshly computed or cached results; `Demo profile`/`Demo suggestion` = clearly labeled seed fixtures; `Your choice` = manual override (always displayed first); `Not enough information` = abstention, never a guess.
+
+**Setup.** The feature is enabled by default and degrades honestly without a key (reads work; advice returns labeled demo results). For live inference, set `MODEL_API_KEY` in your (never committed) `.env` — see the `AI Circle Intelligence` section of [`.env.example`](./.env.example) for the model name, base URL, timeout, cooldown, cache TTL, and budget knobs. The API container picks these up through Compose automatically.
+
+**Demo fixtures.** The seed adds Jamie (frequent recent contact, beyond 5 km so existing discovery expectations are unchanged) and Taylor (discovery opt-out), plus Alex's persisted Level-4 demo profile and Sam's sparse "not enough information" profile. Enable the two consents in **AI Circle settings**, open **Reconnect today**, and judge the abstain/suggest flows end to end keyless.
+
 ## API Endpoints
 
 | Endpoint | Purpose |
@@ -203,6 +226,14 @@ For hackathon judges — helping friends reconnect through proximity-aware socia
 | `GET /friends` | Approved friends with Near-Circle/location status |
 | `GET /friends/:id` | Friend detail; proximity only when discoverable |
 | `GET /friends/:id/route` | Pedestrian route (geometry, distance, duration, steps) |
+| `GET /ai-circle/settings` · `PUT /ai-circle/settings` | AI consents, availability sharing, quiet hours (revoke purges derived data) |
+| `GET /ai-circle/closeness/:friendId` | Stored closeness view (reads never invoke the model) |
+| `POST /ai-circle/closeness/:friendId/assess` | Request (re)assessment; returns 202, processed by the bounded in-process job runner |
+| `PUT /ai-circle/closeness/:friendId` | Manual tier override (`level` 1–5) or clear (`null`) |
+| `GET /ai-circle/opportunities?radius_m=` | Deterministic nearby candidates with stored closeness and optional walk minutes |
+| `POST /ai-circle/opportunities/:friendId/advise` | On-demand meetup advice with pre/post authorization, cache, and budgets |
+| `POST /ai-circle/feedback` | Dismiss / snooze / declined-invite feedback |
+| `GET /ai-circle/usage` | Privacy-safe inference counters (requests, cache, tokens, rate limits) |
 
 ## Project Structure
 
@@ -229,7 +260,7 @@ Live integration tests (require a seeded stack and, for routing, the prepared gr
 
 ```powershell
 npm run db:seed
-$env:RUN_INTEGRATION_TESTS='1'; npm --workspace apps/api run test:integration   # 6 PostGIS + 1 routing
+$env:RUN_INTEGRATION_TESTS='1'; npm --workspace apps/api run test:integration   # 6 PostGIS + 1 routing + 2 live-AI (skip without MODEL_API_KEY)
 ```
 
 See [`.env.example`](./.env.example) for configurable ports, credentials, routing endpoints, and map-tile URLs.
@@ -242,6 +273,7 @@ See [`.env.example`](./.env.example) for configurable ports, credentials, routin
 - Step counts are estimates from walking distance and a configurable stride (default 0.75 m), not measured steps.
 - Map tiles come from an external OSM-compatible provider, not from a local container.
 - Location freshness is demo-driven (30-day window); consent checks are enforced in the API but there is no real account system behind them.
+- AI assessments and advice bill against your Meta Model API key and rate limits; without a key the feature serves stored fixtures and deterministic labeled demo advice. AI outputs are suggestions grounded in disclosed facts, not measured truth — manual tiers always win.
 
 ## Hackathon Development and Attribution
 
