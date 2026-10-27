@@ -36,9 +36,17 @@ export const ASSESS_JSON_SCHEMA = {
     evidence_quality: { type: 'string', enum: [...EVIDENCE_QUALITIES] },
     closeness_reason: { type: 'string', maxLength: MAX_RATIONALE_CHARS },
     activity_trend: { type: 'string', enum: [...ACTIVITY_TRENDS] },
-    reassessment_note: { type: 'string', maxLength: MAX_RATIONALE_CHARS },
+    reassessment_note: {
+      anyOf: [{ type: 'string', maxLength: MAX_RATIONALE_CHARS }, { type: 'null' }],
+    },
   },
-  required: ['closeness_level', 'evidence_quality', 'closeness_reason', 'activity_trend'],
+  required: [
+    'closeness_level',
+    'evidence_quality',
+    'closeness_reason',
+    'activity_trend',
+    'reassessment_note',
+  ],
 } as const;
 
 export const ADVISE_JSON_SCHEMA = {
@@ -48,9 +56,11 @@ export const ADVISE_JSON_SCHEMA = {
     opportunity: { type: 'string', enum: [...ADVICE_OUTCOMES] },
     opportunity_reason: { type: 'string', maxLength: MAX_REASON_CHARS },
     activity: { type: 'string', enum: [...ADVICE_ACTIVITIES] },
-    invitation_draft: { type: 'string', maxLength: MAX_DRAFT_CHARS },
+    invitation_draft: {
+      anyOf: [{ type: 'string', maxLength: MAX_DRAFT_CHARS }, { type: 'null' }],
+    },
   },
-  required: ['opportunity', 'opportunity_reason', 'activity'],
+  required: ['opportunity', 'opportunity_reason', 'activity', 'invitation_draft'],
 } as const;
 
 export interface AssessModelOutput {
@@ -100,8 +110,10 @@ export function parseAssessOutput(value: unknown): AssessModelOutput | null {
     return null;
   }
   if (closeness_level === null && evidence_quality === 'strong') return null;
+  // Meta's schema-constrained output always includes optional keys (explicit
+  // null when there is no note), so null is equivalent to an absent key here.
   const note = value['reassessment_note'];
-  if (note !== undefined && (typeof note !== 'string' || note.length > MAX_RATIONALE_CHARS)) {
+  if (note !== undefined && note !== null && (typeof note !== 'string' || note.length > MAX_RATIONALE_CHARS)) {
     return null;
   }
   return {
@@ -124,8 +136,9 @@ export function parseAdviseOutput(value: unknown): AdviseModelOutput | null {
   if (typeof activity !== 'string' || !ADVICE_ACTIVITIES.includes(activity as AdviceActivity)) {
     return null;
   }
+  // Same null-vs-absent rule as reassessment_note (see parseAssessOutput).
   const draft = value['invitation_draft'];
-  if (draft !== undefined && (typeof draft !== 'string' || draft.length > MAX_DRAFT_CHARS)) {
+  if (draft !== undefined && draft !== null && (typeof draft !== 'string' || draft.length > MAX_DRAFT_CHARS)) {
     return null;
   }
   return {

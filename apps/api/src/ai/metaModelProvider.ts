@@ -56,6 +56,31 @@ export interface MetaModelProviderOptions {
   fetchFn?: ModelFetchFn;
 }
 
+/** Privacy-safe diagnostics only: stage + sizes, never payloads or model text. */
+function logInvalidResponse(stage: string, detail: Record<string, unknown>): void {
+  console.warn(JSON.stringify({ event: 'ai_response_invalid', stage, ...detail }));
+}
+
+/** Shared parse + strict-validate step for both structured contracts. */
+function parseOutput<T>(content: string, parse: (value: unknown) => T | null): T {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content) as unknown;
+  } catch {
+    logInvalidResponse('parse', { content_chars: content.length });
+    throw new ApiError(502, 'ai provider returned an invalid response');
+  }
+  const output = parse(parsed);
+  if (output === null) {
+    logInvalidResponse('validate', {
+      content_chars: content.length,
+      keys: isRecord(parsed) ? Object.keys(parsed).sort().join(',') : typeof parsed,
+    });
+    throw new ApiError(502, 'ai provider returned an invalid response');
+  }
+  return output;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
@@ -104,7 +129,13 @@ export function createMetaModelProvider(options: MetaModelProviderOptions): Circ
             { role: 'system', content: systemPrompt },
             { role: 'user', content: JSON.stringify(userPayload) },
           ],
-          response_format: { type: 'json_schema', json_schema: { name: schemaName, schema } },
+          // Strict-subset-conforming schemas (required lists every key,
+          // optionals are nullable) so the server enforces the contract
+          // instead of silently normalizing it.
+          response_format: {
+            type: 'json_schema',
+            json_schema: { name: schemaName, schema, strict: true },
+          },
           temperature: 0,
           max_tokens: config.maxOutputTokens,
         }),
@@ -140,8 +171,15 @@ export function createMetaModelProvider(options: MetaModelProviderOptions): Circ
     }
     const choices = isRecord(payload) ? payload['choices'] : undefined;
     const first = Array.isArray(choices) ? choices[0] : undefined;
+    const finishReason =
+      isRecord(first) && typeof first['finish_reason'] === 'string' ? first['finish_reason'] : null;
     const content = isRecord(first) && isRecord(first['message']) ? first['message']['content'] : undefined;
     if (typeof content !== 'string' || content.trim() === '') {
+      logInvalidResponse('envelope', {
+        finish_reason: finishReason,
+        content_type: typeof content,
+        content_chars: typeof content === 'string' ? content.length : 0,
+      });
       throw new ApiError(502, 'ai provider returned an invalid response');
     }
     return { content, usage: readUsage(isRecord(payload) ? payload['usage'] : undefined) };
@@ -157,16 +195,7 @@ export function createMetaModelProvider(options: MetaModelProviderOptions): Circ
         'friendship_assessment',
         ASSESS_JSON_SCHEMA,
       );
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(content) as unknown;
-      } catch {
-        throw new ApiError(502, 'ai provider returned an invalid response');
-      }
-      const output = parseAssessOutput(parsed);
-      if (output === null) {
-        throw new ApiError(502, 'ai provider returned an invalid response');
-      }
+      const output = parseOutput(content, parseAssessOutput);
       return { output, usage, modelId: config.modelName === '' ? MODEL_ID : config.modelName };
     },
     async adviseMeetup(input: AdviseModelInput): Promise<AdviseCallResult> {
@@ -176,16 +205,7 @@ export function createMetaModelProvider(options: MetaModelProviderOptions): Circ
         'meetup_advice',
         ADVISE_JSON_SCHEMA,
       );
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(content) as unknown;
-      } catch {
-        throw new ApiError(502, 'ai provider returned an invalid response');
-      }
-      const output = parseAdviseOutput(parsed);
-      if (output === null) {
-        throw new ApiError(502, 'ai provider returned an invalid response');
-      }
+      const output = parseOutput(content, parseAdviseOutput);
       return { output, usage, modelId: config.modelName === '' ? MODEL_ID : config.modelName };
     },
   };

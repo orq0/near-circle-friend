@@ -79,6 +79,13 @@ describe('Meta Model API adapter', () => {
     expect(body['model']).toBe('muse-spark-1.3');
     expect(body['temperature']).toBe(0);
     expect((body['response_format'] as Record<string, unknown>)['type']).toBe('json_schema');
+    const jsonSchema = (body['response_format'] as Record<string, unknown>)['json_schema'] as Record<
+      string,
+      unknown
+    >;
+    expect(jsonSchema['strict']).toBe(true);
+    const assessSchema = jsonSchema['schema'] as { required: string[]; properties: Record<string, unknown> };
+    expect(assessSchema.required).toContain('reassessment_note');
     expect(seen[0]?.init.headers['authorization']).toBe('Bearer test-key');
     expect(JSON.stringify(body)).not.toContain('test-key');
   });
@@ -100,6 +107,81 @@ describe('Meta Model API adapter', () => {
     const result = await provider.adviseMeetup(ADVISE_INPUT);
     expect(result.output.opportunity).toBe('suggest');
     expect(result.output.invitation_draft).toBe('Coffee today?');
+  });
+
+  // Meta's schema-constrained output always includes optional keys; with an
+  // incomplete `required` array the server normalizes optionals to nullable,
+  // so a real Muse Spark reply carries "invitation_draft": null rather than
+  // omitting the key. The validator must accept explicit null (live 502 bug).
+  it('accepts the normalized wire shape: optional fields present as null', async () => {
+    const advise = createMetaModelProvider({
+      config: CONFIG,
+      fetchFn: jsonFetch(
+        chatResponse(
+          JSON.stringify({
+            opportunity: 'later',
+            opportunity_reason: 'No shared availability today.',
+            activity: 'none',
+            invitation_draft: null,
+          }),
+        ),
+      ),
+    });
+    const advice = await advise.adviseMeetup(ADVISE_INPUT);
+    expect(advice.output.opportunity).toBe('later');
+    expect(advice.output.invitation_draft).toBeNull();
+
+    const assess = createMetaModelProvider({
+      config: CONFIG,
+      fetchFn: jsonFetch(
+        chatResponse(
+          JSON.stringify({
+            closeness_level: 4,
+            evidence_quality: 'moderate',
+            closeness_reason: 'Established reciprocal friendship.',
+            activity_trend: 'increasing',
+            reassessment_note: null,
+          }),
+        ),
+      ),
+    });
+    const assessed = await assess.assessFriendship(ASSESS_INPUT);
+    expect(assessed.output.closeness_level).toBe(4);
+    expect(assessed.output.reassessment_note).toBeNull();
+  });
+
+  // Null-as-absent is the only relaxation: wrong types still reject.
+  it('rejects non-string optional fields with 502', async () => {
+    const badDraft = createMetaModelProvider({
+      config: CONFIG,
+      fetchFn: jsonFetch(
+        chatResponse(
+          JSON.stringify({
+            opportunity: 'suggest',
+            opportunity_reason: 'Nearby and available.',
+            activity: 'coffee',
+            invitation_draft: 42,
+          }),
+        ),
+      ),
+    });
+    expect(await catchStatus(async () => badDraft.adviseMeetup(ADVISE_INPUT))).toBe(502);
+
+    const badNote = createMetaModelProvider({
+      config: CONFIG,
+      fetchFn: jsonFetch(
+        chatResponse(
+          JSON.stringify({
+            closeness_level: 4,
+            evidence_quality: 'moderate',
+            closeness_reason: 'Established reciprocal friendship.',
+            activity_trend: 'increasing',
+            reassessment_note: true,
+          }),
+        ),
+      ),
+    });
+    expect(await catchStatus(async () => badNote.assessFriendship(ASSESS_INPUT))).toBe(502);
   });
 
   it('refuses to call without an API key and never touches fetch', async () => {
