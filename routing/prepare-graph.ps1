@@ -7,7 +7,9 @@
   ships a foot profile, then runs the MLD pipeline
   (osrm-extract -p foot.lua, osrm-partition, osrm-customize).
 
-  Output: routing/data/near-circle.osrm plus sidecar files. Only after these
+  Output: the routing/data/near-circle.osrm.* MLD file set. OSRM v5.27
+  writes no bare `.osrm` file, so the `.osrm` path is a basename prefix used
+  by osrm-partition, osrm-customize, and osrm-routed. Only after these
   artifacts exist does `npm run startall` enable the `routing` Compose profile.
 
   The script creates and removes exactly one container of its own
@@ -138,9 +140,11 @@ foreach ($step in @(
   if ($LASTEXITCODE -ne 0) { Write-Host "ERROR: $($step[0]) failed." -ForegroundColor Red; exit 1 }
 }
 
-$osrm = Join-Path $dataPath 'near-circle.osrm'
-if (-not (Test-Path $osrm)) {
-  Write-Host 'ERROR: expected artifact near-circle.osrm is missing.' -ForegroundColor Red
+$graph = Test-RoutingGraph -DataDir $dataPath
+if (-not $graph.Ready) {
+  Write-Host 'ERROR: MLD graph incomplete; missing artifacts:' -ForegroundColor Red
+  foreach ($name in $graph.Missing) { Write-Host "  - $name" -ForegroundColor Red }
+  Write-Host 'Inspect the osrm-extract/partition/customize output above.' -ForegroundColor Yellow
   exit 1
 }
 $totalMB = [math]::Round(((Get-ChildItem $dataPath -File | Measure-Object Length -Sum).Sum / 1MB), 1)

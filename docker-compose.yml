@@ -60,7 +60,8 @@ services:
 
   # Independent pedestrian routing API. Gated behind the `routing` Compose
   # profile: plain `up` skips it while no foot-profile graph exists (Phase 1).
-  # Once the Phase 3 bootstrap prepares routing/data/near-circle.osrm, startall
+  # Once the Phase 3 bootstrap prepares routing/data/near-circle.osrm.* (the
+  # .osrm path is a basename prefix; v5.27 writes no bare .osrm file), startall
   # enables the profile automatically. See routing/README.md. restart is "no"
   # so an unprepared graph shows as stopped, never as a fake-healthy router.
   near-circle-routing-walk:

@@ -3,6 +3,7 @@
 . "$PSScriptRoot/common.ps1"
 
 $repoRoot = Get-RepoRoot
+. (Join-Path $repoRoot 'routing/prepare-graph-lib.ps1')
 $nc = Read-NearCircleEnv -RepoRoot $repoRoot
 $composeFile = Join-Path $repoRoot 'docker-compose.yml'
 
@@ -66,9 +67,9 @@ if (Test-HttpOk -Url $webUrl) {
 }
 
 # ---- Routing: graph artifact first, then direct API test ----
-$graphFile = Join-Path $repoRoot 'routing/data/near-circle.osrm'
+$graph = Test-RoutingGraph -DataDir (Join-Path $repoRoot 'routing/data')
 $rtNote = Get-ContainerNote 'near-circle-routing-walk'
-if (-not (Test-Path $graphFile)) {
+if (-not $graph.Ready) {
     Write-NcStatus 'near-circle-routing-walk' 'not-ready' ("no pedestrian graph (Phase 3); {0}" -f $rtNote)
 } else {
     $routeProbe = "$($nc['ROUTING_WALK_HOST_URL'])/route/v1/driving/120.9750,14.5810;120.9768,14.5828?overview=false"

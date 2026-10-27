@@ -158,7 +158,7 @@ See [`.env.example`](./.env.example). Ports, credentials, routing endpoints, and
 
 - **Docker missing:** `startall` reports an actionable error; use `npm run dev:api` and `npm run dev:web` for native web/API development.
 - **Port conflict:** Configure `WEB_PORT`, `API_PORT`, `POSTGRES_PORT`, or `ROUTING_WALK_PORT` in `.env`.
-- **Router shows `not-ready`:** Expected in Phase 1. The service sits behind the `routing` Compose profile and starts only after the Phase 3 graph bootstrap prepares `routing/data/near-circle.osrm`. Core `up` never pulls the OSRM image. See [`routing/README.md`](./routing/README.md).
+- **Router shows `not-ready`:** Expected in Phase 1. The service sits behind the `routing` Compose profile and starts only after the Phase 3 graph bootstrap prepares the `routing/data/near-circle.osrm.*` file set. Core `up` never pulls the OSRM image. See [`routing/README.md`](./routing/README.md).
 - **npm `EPERM` on cache (locked-down profiles):** Run `$env:npm_config_cache = "$PWD\.npm-cache"; npm install`.
 - **Tile outage:** Map tiles are provided externally. `status` may report their availability as `unknown`, and the app must not misrepresent unavailable route functionality as working.
 

@@ -52,6 +52,39 @@ function Test-PbfHeader {
   }
 }
 
+# OSRM v5.27 stopped writing the bare intermediate `.osrm` file in
+# osrm-extract ("CHANGED: Do not generate intermediate .osrm file"), so the
+# graph path (e.g. /data/near-circle.osrm) is a basename prefix, not a regular
+# file. Readiness for `osrm-routed --algorithm mld` is the joint presence of
+# the MLD sentinel files written by the last two pipeline stages: partition
+# (.osrm.partition, .osrm.cells) and customize (.osrm.mldgr,
+# .osrm.cell_metrics). Their joint presence transitively proves osrm-extract
+# succeeded, because each stage consumes the previous stage's outputs.
+# Returns an object with Ready ([bool]), BasePath ([string]), and Missing
+# ([string[]] of absent sentinel file names).
+function Test-RoutingGraph {
+  param([Parameter(Mandatory = $true)][string]$DataDir)
+
+  $basePath = Join-Path $DataDir 'near-circle.osrm'
+  $sentinels = @(
+    'near-circle.osrm.partition',
+    'near-circle.osrm.cells',
+    'near-circle.osrm.mldgr',
+    'near-circle.osrm.cell_metrics'
+  )
+  $missing = @()
+  foreach ($name in $sentinels) {
+    if (-not (Test-Path -LiteralPath (Join-Path $DataDir $name))) {
+      $missing += $name
+    }
+  }
+  return [pscustomobject]@{
+    Ready    = ($missing.Count -eq 0)
+    BasePath = $basePath
+    Missing  = $missing
+  }
+}
+
 # True when `docker inspect` JSON describes a container this bootstrap owns.
 # Accepts the raw inspect output (a JSON array) or a single object. Anything
 # unparseable, foreign, or unlabeled returns $false: the caller must refuse

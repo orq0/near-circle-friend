@@ -82,6 +82,54 @@ Describe 'Test-PbfHeader' {
   }
 }
 
+Describe 'Test-RoutingGraph' {
+  $sentinels = @(
+    'near-circle.osrm.partition',
+    'near-circle.osrm.cells',
+    'near-circle.osrm.mldgr',
+    'near-circle.osrm.cell_metrics'
+  )
+
+  function New-GraphDir([string[]]$present) {
+    $dir = Join-Path $TestDrive ([guid]::NewGuid().ToString())
+    New-Item -ItemType Directory -Force $dir | Out-Null
+    foreach ($name in $present) {
+      [System.IO.File]::WriteAllBytes((Join-Path $dir $name), [byte[]]@(0x01))
+    }
+    return $dir
+  }
+
+  It 'reports ready when all MLD sentinels exist, without a bare .osrm file' {
+    $dir = New-GraphDir $sentinels
+    $result = Test-RoutingGraph -DataDir $dir
+    $result.Ready | Should Be $true
+    $result.Missing.Count | Should Be 0
+    $result.BasePath | Should Match 'near-circle\.osrm$'
+  }
+
+  It 'reports not-ready and names the missing sentinels' {
+    $dir = New-GraphDir @('near-circle.osrm.partition', 'near-circle.osrm.cells')
+    $result = Test-RoutingGraph -DataDir $dir
+    $result.Ready | Should Be $false
+    ($result.Missing -contains 'near-circle.osrm.mldgr') | Should Be $true
+    ($result.Missing -contains 'near-circle.osrm.cell_metrics') | Should Be $true
+  }
+
+  It 'reports not-ready for an empty data directory' {
+    $dir = New-GraphDir @()
+    $result = Test-RoutingGraph -DataDir $dir
+    $result.Ready | Should Be $false
+    $result.Missing.Count | Should Be 4
+  }
+
+  It 'does not mistake the PBF for a prepared graph' {
+    $dir = New-GraphDir @()
+    [System.IO.File]::WriteAllBytes((Join-Path $dir 'near-circle.osm.pbf'), [byte[]]@(0x01, 0x02))
+    $result = Test-RoutingGraph -DataDir $dir
+    $result.Ready | Should Be $false
+  }
+}
+
 Describe 'Test-ContainerOwned' {
   It 'recognizes its own smoke container' {
     $json = '[{"Id":"abc123","Config":{"Labels":{"near-circle.managed-by":"prepare-graph","near-circle.run-id":"run-1"}}}]'

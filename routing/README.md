@@ -13,7 +13,7 @@ validated route geometry to the UI.
 - In-Compose URL: `http://near-circle-routing-walk:5000` (`ROUTING_WALK_URL`).
 - Host URL: `http://localhost:5002` (`ROUTING_WALK_HOST_URL`). Port 5001 is
   deliberately avoided: it is commonly occupied by unrelated OSRM instances.
-- Graph artifacts: `routing/data/near-circle.osrm` plus sidecars (gitignored).
+- Graph artifacts: the `routing/data/near-circle.osrm.*` MLD file set (gitignored). OSRM v5.27 writes no bare `.osrm` file; the `.osrm` path is a basename prefix.
 - Readiness signal: the artifacts exist **and** a known Manila test route
   succeeds with walking-plausible speed.
 - Profile gating: the service sits behind the `routing` Compose profile.

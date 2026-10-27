@@ -3,6 +3,7 @@
 . "$PSScriptRoot/common.ps1"
 
 $repoRoot = Get-RepoRoot
+. (Join-Path $repoRoot 'routing/prepare-graph-lib.ps1')
 $nc = Read-NearCircleEnv -RepoRoot $repoRoot
 $composeFile = Join-Path $repoRoot 'docker-compose.yml'
 
@@ -29,9 +30,9 @@ Write-Host ''
 # The router sits behind the `routing` profile until its pedestrian graph is
 # prepared (Phase 3). Enable the profile only when the graph artifact exists,
 # so plain Phase 1 startup never pulls or requires OSRM.
-$graphFile = Join-Path $repoRoot 'routing/data/near-circle.osrm'
+$graph = Test-RoutingGraph -DataDir (Join-Path $repoRoot 'routing/data')
 $upArgs = @('compose', '-f', $composeFile, 'up', '-d')
-if (Test-Path $graphFile) {
+if ($graph.Ready) {
     $upArgs = @('compose', '-f', $composeFile, '--profile', 'routing', 'up', '-d')
     Write-Host 'Pedestrian graph detected: enabling the routing profile.' -ForegroundColor DarkGray
 }
@@ -80,7 +81,7 @@ if (Wait-HttpOk -Url $webUrl -TimeoutSec 120) {
 }
 
 # ---- Routing: scaffolded in Phase 1; honest not-ready until a foot graph exists ----
-if (-not (Test-Path $graphFile)) {
+if (-not $graph.Ready) {
     Write-NcStatus 'near-circle-routing-walk' 'not-ready' 'no pedestrian graph yet (Phase 3 bootstrap; see routing/README.md)'
 } else {
     $routeProbe = "$($nc['ROUTING_WALK_HOST_URL'])/route/v1/driving/120.9750,14.5810;120.9768,14.5828?overview=false"
