@@ -256,7 +256,10 @@ describe('Near-Circle Phase 2 UI', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open Near-Circle' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Select Coleen' }));
     expect(await screen.findByText('Near-Circle enabled')).toBeInTheDocument();
-    expect(screen.getByText('About 280 m away.')).toBeInTheDocument();
+    // The advisor panel below repeats the proximity context, so scope to the detail card.
+    expect(
+      screen.getByText('About 280 m away.', { selector: '.friend-card > .proximity-line' }),
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'View walking route' }));
     expect(screen.getByLabelText('Walking route')).toBeInTheDocument();
     expect(await screen.findByText('No walking route available.')).toBeInTheDocument();
@@ -393,16 +396,19 @@ describe('Near-Circle Phase 2 UI', () => {
   });
 
   it('asks Meta AI for a recommendation directly from the friend card', async () => {
-    installFetch();
+    const requested: string[] = [];
+    installFetch({}, requested);
     render(<App />);
     await screen.findByText('Chats');
     fireEvent.click(screen.getByRole('button', { name: 'Open Near-Circle' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Select Coleen' }));
     expect(await screen.findByText('✨ Fancy catching up today?')).toBeInTheDocument();
+    expect(requested.some((entry) => entry.includes('/advise'))).toBe(false);
     fireEvent.click(screen.getByRole('button', { name: 'Ask Meta AI' }));
     expect(await screen.findByText('Worth asking today')).toBeInTheDocument();
     expect(screen.getByText('Demo suggestion')).toBeInTheDocument();
     expect(screen.getByDisplayValue(/Hey Coleen! Coffee today/)).toBeInTheDocument();
+    expect(requested.some((entry) => entry.includes('/advise'))).toBe(true);
   });
 
   it('explains gracefully when meetup advice is unavailable on the friend card', async () => {
