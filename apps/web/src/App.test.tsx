@@ -219,14 +219,28 @@ describe('Near-Circle Phase 2 UI', () => {
     });
   });
 
-  it('keeps the loading state while visibility cannot load', async () => {
+  it('shows a retry state instead of loading forever when visibility cannot load', async () => {
     // Broken /api path (e.g. a proxy pointing at container localhost):
-    // visibility stays null, so the loading state must persist instead of
-    // silently resolving.
+    // visibility stays null, the loading text must resolve into an honest
+    // error with a retry affordance, and no toggle is rendered.
     installFetch({ failUrls: ['/near-circle/visibility'] });
     render(<App />);
-    expect(await screen.findByText('Loading Near-Circle status…')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Could not load Near-Circle status. Check the API connection, then retry.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
     expect(screen.queryByRole('switch', { name: 'Near-Circle visibility' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Loading Near-Circle status…')).not.toBeInTheDocument();
+  });
+
+  it('recovers the visibility toggle after a retry', async () => {
+    const routes: MockRoutes = { failUrls: ['/near-circle/visibility'] };
+    installFetch(routes);
+    render(<App />);
+    expect(await screen.findByRole('button', { name: 'Retry' })).toBeInTheDocument();
+    routes.failUrls = [];
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(await screen.findByRole('switch', { name: 'Near-Circle visibility' })).toBeInTheDocument();
   });
 
   it('resolves the loading state once visibility loads', async () => {

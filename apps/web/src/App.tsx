@@ -30,6 +30,8 @@ export function App() {
   const [apiHealthy, setApiHealthy] = useState<boolean | null>(null);
   const [visibility, setVisibility] = useState<VisibilityState | null>(null);
   const [visibilityError, setVisibilityError] = useState(false);
+  const [visibilityLoadError, setVisibilityLoadError] = useState(false);
+  const [visibilityNonce, setVisibilityNonce] = useState(0);
   const [friendStatus, setFriendStatus] = useState<FriendStatusInfo[] | null>(null);
 
   const [radiusM, setRadiusM] = useState(1000);
@@ -58,8 +60,13 @@ export function App() {
     fetchVisibility().then((state) => {
       if (cancelled) return;
       if (state !== null) {
+        setVisibilityLoadError(false);
         setVisibility(state);
         setRadiusM(state.radius_m);
+      } else {
+        // Loading must never be indefinite: surface the failure and let the
+        // user retry instead of spinning on "Loading Near-Circle status…".
+        setVisibilityLoadError(true);
       }
     });
     fetchFriends().then((list) => {
@@ -68,7 +75,7 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [visibilityNonce]);
 
   // Live radar results whenever the radar is visible, the radius changes,
   // discovery is toggled, or the user retries.
@@ -169,6 +176,8 @@ export function App() {
             selectedId={selectedConvoId}
             visibility={visibility}
             visibilityError={visibilityError}
+            visibilityLoadError={visibilityLoadError}
+            onRetryVisibility={() => setVisibilityNonce((n) => n + 1)}
             apiHealthy={apiHealthy}
             friendStatus={friendStatus}
             chatOpen={chatOpen}

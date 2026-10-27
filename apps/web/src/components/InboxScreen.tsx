@@ -11,6 +11,8 @@ interface InboxScreenProps {
   selectedId: string;
   visibility: VisibilityState | null;
   visibilityError: boolean;
+  visibilityLoadError: boolean;
+  onRetryVisibility: () => void;
   apiHealthy: boolean | null;
   friendStatus: FriendStatusInfo[] | null;
   chatOpen: boolean;
@@ -35,6 +37,7 @@ export function InboxScreen({
 }: InboxScreenProps) {
   const selected = friends.find((friend) => friend.id === selectedId) ?? friends[0];
   const statusById = new Map((friendStatus ?? []).map((entry) => [entry.id, entry]));
+  const showLoadError = visibility === null && visibilityLoadError;
   return (
     <section className="screen messenger" aria-label="Messenger-style inbox">
       <PrototypeBanner />
@@ -62,12 +65,21 @@ export function InboxScreen({
           >
             Open Near-Circle
           </button>
-          {visibility === null ? (
+          {visibility === null && showLoadError ? (
+            <p className="toggle-error" role="alert">
+              Could not load Near-Circle status. Check the API connection, then retry.
+            </p>
+          ) : visibility === null ? (
             <p className="radar-state" role="status">
               Loading Near-Circle status…
             </p>
           ) : (
             <VisibilityToggle enabled={visibility.enabled} onChange={onVisibilityChange} />
+          )}
+          {showLoadError && (
+            <button type="button" className="secondary-cta" onClick={onRetryVisibility}>
+              Retry
+            </button>
           )}
           {visibilityError && (
             <p className="toggle-error" role="alert">

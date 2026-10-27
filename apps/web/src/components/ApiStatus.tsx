@@ -8,7 +8,7 @@ export function ApiStatus({ healthy }: { healthy: boolean | null }) {
   }
   return (
     <p className={healthy ? 'api-pill ok' : 'api-pill down'} role="status">
-      {healthy ? 'API connected' : 'API unreachable'}
+      {healthy ? 'API health OK' : 'API unreachable'}
     </p>
   );
 }
