@@ -27,6 +27,8 @@ export function InboxScreen({
   selectedId,
   visibility,
   visibilityError,
+  visibilityLoadError,
+  onRetryVisibility,
   apiHealthy,
   friendStatus,
   chatOpen,
