@@ -69,3 +69,13 @@ profile comes from the prepared foot graph, not the URL.
 
 Any `NoRoute` response surfaces as an honest unavailable state in the UI,
 never as a straight line labeled "walking".
+
+## Regression tests
+
+`routing/prepare-graph-lib.ps1` holds the Docker-free bootstrap logic (PBF
+header validation, smoke-container ownership). Its Pester suite needs no
+Docker, network, or fixtures:
+
+```powershell
+Invoke-Pester ./routing/tests/PrepareGraphLib.Tests.ps1
+```

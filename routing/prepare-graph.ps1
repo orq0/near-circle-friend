@@ -11,8 +11,11 @@
   artifacts exist does `npm run startall` enable the `routing` Compose profile.
 
   The script creates and removes exactly one container of its own
-  (near-circle-routing-smoke) for the validation probe. It never touches
-  unrelated containers, volumes, or the third-party service on port 5001.
+  (near-circle-routing-smoke) for the validation probe. Removal is
+  ownership-scoped: a pre-existing container with that name is removed only
+  when its labels prove this bootstrap created it; otherwise the script
+  refuses to continue. It never touches unrelated containers, volumes, or
+  the third-party service on port 5001.
 
 .PARAMETER DataDir
   Graph working directory. Defaults to routing/data/ next to this script.
@@ -40,6 +43,8 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+. (Join-Path $PSScriptRoot 'prepare-graph-lib.ps1')
 
 function Test-PortOpen([int]$Port) {
   $client = $null
@@ -82,13 +87,22 @@ if ($footCount -eq 0) {
 }
 Write-Host 'Found foot.lua pedestrian profile.' -ForegroundColor Green
 
-# ---- 2. Download the Metro Manila extract ----
-$needDownload = $Force.IsPresent
-if (-not (Test-Path $pbfPath)) {
+# ---- 2. Metro Manila extract: validate before reuse, download only when needed ----
+$needDownload = $false
+if ($Force.IsPresent) {
+  Write-Host 'Force requested: re-downloading the PBF.' -ForegroundColor DarkGray
   $needDownload = $true
-} elseif ((Get-Item $pbfPath).Length -lt 1MB) {
-  Write-Host 'Existing PBF is suspiciously small; re-downloading.' -ForegroundColor Yellow
+} elseif (-not (Test-Path $pbfPath)) {
   $needDownload = $true
+} else {
+  $existing = Test-PbfHeader -Path $pbfPath
+  if ($existing.Valid) {
+    $existingMB = [math]::Round((Get-Item $pbfPath).Length / 1MB, 1)
+    Write-Host "Reusing existing near-circle.osm.pbf ($existingMB MB; $($existing.Reason))." -ForegroundColor DarkGray
+  } else {
+    Write-Host "Existing PBF invalid ($($existing.Reason)); re-downloading." -ForegroundColor Yellow
+    $needDownload = $true
+  }
 }
 if ($needDownload) {
   Write-Host "Downloading Metro Manila extract..." -ForegroundColor Cyan
@@ -100,20 +114,18 @@ if ($needDownload) {
     Write-Host 'Check the URL or pass -PbfUrl with a working Metro Manila extract.' -ForegroundColor Yellow
     exit 1
   }
-} else {
-  Write-Host 'Reusing existing near-circle.osm.pbf (pass -Force to re-download).' -ForegroundColor DarkGray
 }
-if ((Get-Item $pbfPath).Length -lt 1MB) {
-  Write-Host 'ERROR: PBF is smaller than 1 MB; refusing to continue.' -ForegroundColor Red
+if (-not (Test-Path $pbfPath) -or (Get-Item $pbfPath).Length -lt 1MB) {
+  Write-Host 'ERROR: PBF is missing or smaller than 1 MB; refusing to continue.' -ForegroundColor Red
   exit 1
 }
-$magic = [System.IO.File]::ReadAllBytes($pbfPath)[0]
-if ($magic -ne 0x0A) {
-  Write-Host 'ERROR: downloaded file is not a PBF (bad magic byte). It may be an error page.' -ForegroundColor Red
+$verified = Test-PbfHeader -Path $pbfPath
+if (-not $verified.Valid) {
+  Write-Host "ERROR: PBF failed validation ($($verified.Reason)). It may be an error page." -ForegroundColor Red
   exit 1
 }
 $pbfMB = [math]::Round((Get-Item $pbfPath).Length / 1MB, 1)
-Write-Host "PBF ready: $pbfMB MB." -ForegroundColor Green
+Write-Host "PBF ready: $pbfMB MB ($($verified.Reason))." -ForegroundColor Green
 
 # ---- 3. MLD pipeline: extract (foot) -> partition -> customize ----
 foreach ($step in @(
@@ -139,10 +151,32 @@ if (Test-PortOpen $SmokePort) {
   Write-Host "ERROR: port $SmokePort is already in use. Free it or pass -SmokePort." -ForegroundColor Red
   exit 1
 }
+$smokeName = 'near-circle-routing-smoke'
+$runId = [guid]::NewGuid().ToString()
+
+# A stale name is reclaimed only when its labels prove this bootstrap owns it.
+$existingId = (& docker ps -a --filter "name=^/${smokeName}$" --format '{{.ID}}' 2>$null | Select-Object -First 1)
+if (-not [string]::IsNullOrWhiteSpace($existingId)) {
+  $existingId = $existingId.Trim()
+  $existingJson = & docker inspect $existingId 2>$null
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host 'Stale smoke container vanished; continuing.' -ForegroundColor DarkGray
+  } elseif (Test-ContainerOwned -InspectJson ($existingJson -join "`n")) {
+    Write-Host 'Removing stale smoke container from a previous run.' -ForegroundColor DarkGray
+    & docker rm -f $existingId 2>&1 | Out-Null
+  } else {
+    Write-Host "ERROR: a container named $smokeName already exists and is not managed by this script." -ForegroundColor Red
+    Write-Host 'Remove or rename it, then retry. Nothing was deleted.' -ForegroundColor Yellow
+    exit 1
+  }
+}
 Write-Host 'Starting ephemeral validation router...' -ForegroundColor Cyan
-& docker rm -f near-circle-routing-smoke 2>&1 | Out-Null
-& docker run -d --name near-circle-routing-smoke -p "127.0.0.1:${SmokePort}:5000" "-v${dataPath}:/data:ro" $Image osrm-routed --algorithm mld /data/near-circle.osrm 2>&1 | Out-Null
+$smokeId = ''
+$started = & docker run -d --name $smokeName --label "${SmokeLabelKey}=${SmokeLabelValue}" --label "near-circle.run-id=$runId" -p "127.0.0.1:${SmokePort}:5000" "-v${dataPath}:/data:ro" $Image osrm-routed --algorithm mld /data/near-circle.osrm 2>&1
 if ($LASTEXITCODE -ne 0) { Write-Host 'ERROR: smoke router failed to start.' -ForegroundColor Red; exit 1 }
+$firstLine = $started | Select-Object -First 1
+$smokeId = if ($null -eq $firstLine) { '' } else { "$firstLine".Trim() }
+if ([string]::IsNullOrWhiteSpace($smokeId)) { Write-Host 'ERROR: smoke router failed to start.' -ForegroundColor Red; exit 1 }
 
 try {
   # Demo pair: Rizal Park center -> Coleen fixture. Must route on footpaths.
@@ -175,7 +209,14 @@ try {
   }
   Write-Host 'Smoke test passed: pedestrian router answers with walking-plausible results.' -ForegroundColor Green
 } finally {
-  & docker rm -f near-circle-routing-smoke 2>&1 | Out-Null
+  # Ownership-scoped cleanup: remove only the container this run started,
+  # re-verified by inspect immediately before removal.
+  if (-not [string]::IsNullOrWhiteSpace($smokeId)) {
+    $smokeJson = & docker inspect $smokeId 2>$null
+    if ($LASTEXITCODE -eq 0 -and (Test-ContainerOwned -InspectJson ($smokeJson -join "`n"))) {
+      & docker rm -f $smokeId 2>&1 | Out-Null
+    }
+  }
 }
 
 Write-Host ''
