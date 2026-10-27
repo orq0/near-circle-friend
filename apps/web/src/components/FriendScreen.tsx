@@ -1,7 +1,13 @@
-import type { CircleInsight as CircleInsightData, FriendDetail } from '../types';
+import type {
+  CircleInsight as CircleInsightData,
+  FriendDetail,
+  OpportunityCandidate,
+} from '../types';
 import { formatDistance } from '../radar';
 import { PrototypeBanner } from './PrototypeBanner';
 import { CircleInsight } from './CircleInsight';
+import { AskAiPanel } from './AskAiPanel';
+import type { CandidateAdvice } from './ReconnectTodayScreen';
 
 interface FriendScreenProps {
   detail: FriendDetail | null;
@@ -16,6 +22,13 @@ interface FriendScreenProps {
   onRetryInsight: () => void;
   onRequestReassessment: () => void;
   onSaveOverride: (level: number | null) => void;
+  askCandidate: OpportunityCandidate | null;
+  askAdvice: CandidateAdvice;
+  onAskAdvice: (candidate: OpportunityCandidate) => void;
+  onDismissAdvice: (candidate: OpportunityCandidate) => void;
+  onSnoozeAdvice: (candidate: OpportunityCandidate) => void;
+  onDeclineAdviceInvite: (candidate: OpportunityCandidate) => void;
+  onOpenAdviceRoute: () => void;
 }
 
 export function FriendScreen({
@@ -31,6 +44,13 @@ export function FriendScreen({
   onRetryInsight,
   onRequestReassessment,
   onSaveOverride,
+  askCandidate,
+  askAdvice,
+  onAskAdvice,
+  onDismissAdvice,
+  onSnoozeAdvice,
+  onDeclineAdviceInvite,
+  onOpenAdviceRoute,
 }: FriendScreenProps) {
   return (
     <section className="screen" aria-label="Selected friend">
@@ -88,6 +108,34 @@ export function FriendScreen({
           onRetry={onRetryInsight}
           onRequestReassessment={onRequestReassessment}
           onSaveOverride={onSaveOverride}
+        />
+      )}
+      {detail !== null && (
+        <div className="friend-card ai-panel" aria-label={`Meetup suggestion for ${detail.display_name}`}>
+          <h3>✨ Fancy catching up today?</h3>
+          {askCandidate !== null ? (
+            <p className="insight-rationale">
+              Ask Meta AI for a thoughtful suggestion about reconnecting with {detail.display_name} —
+              a good moment, a simple plan, and help finding the words.
+            </p>
+          ) : (
+            <p className="insight-rationale">
+              AI suggestions aren&apos;t available for {detail.display_name} right now.
+            </p>
+          )}
+        </div>
+      )}
+      {detail !== null && askCandidate !== null && (
+        <AskAiPanel
+          candidate={askCandidate}
+          state={askAdvice.state}
+          advice={askAdvice.advice}
+          notice={askAdvice.notice}
+          onAsk={() => onAskAdvice(askCandidate)}
+          onDismiss={() => onDismissAdvice(askCandidate)}
+          onSnooze={() => onSnoozeAdvice(askCandidate)}
+          onDeclineInvite={() => onDeclineAdviceInvite(askCandidate)}
+          onOpenRoute={onOpenAdviceRoute}
         />
       )}
     </section>

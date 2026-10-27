@@ -392,6 +392,34 @@ describe('Near-Circle Phase 2 UI', () => {
     expect(screen.getByText('Demo profile')).toBeInTheDocument();
   });
 
+  it('asks Meta AI for a recommendation directly from the friend card', async () => {
+    installFetch();
+    render(<App />);
+    await screen.findByText('Chats');
+    fireEvent.click(screen.getByRole('button', { name: 'Open Near-Circle' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Select Coleen' }));
+    expect(await screen.findByText('✨ Fancy catching up today?')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Ask Meta AI' }));
+    expect(await screen.findByText('Worth asking today')).toBeInTheDocument();
+    expect(screen.getByText('Demo suggestion')).toBeInTheDocument();
+    expect(screen.getByDisplayValue(/Hey Coleen! Coffee today/)).toBeInTheDocument();
+  });
+
+  it('explains gracefully when meetup advice is unavailable on the friend card', async () => {
+    installFetch({
+      detail: { ...DEFAULT_DETAIL, discoverable: false, distance_m: null, bearing_deg: null },
+    });
+    render(<App />);
+    await screen.findByText('Chats');
+    fireEvent.click(screen.getByRole('button', { name: 'Open Near-Circle' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Select Coleen' }));
+    expect(await screen.findByText('✨ Fancy catching up today?')).toBeInTheDocument();
+    expect(
+      screen.getByText("AI suggestions aren't available for Coleen right now."),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Ask Meta AI' })).not.toBeInTheDocument();
+  });
+
   it('opens AI settings and saves a consent change', async () => {
     const requested: string[] = [];
     installFetch({}, requested);

@@ -374,6 +374,31 @@ export function App() {
     setChatOpen(true);
   }, []);
 
+  // Friend Detail reuses the on-demand advisor through the same candidate
+  // shape and advice slots as Reconnect Today. The candidate is synthesized
+  // locally from data already on screen, so viewing a friend never triggers
+  // inference; only the Ask action calls the backend, which stays
+  // authoritative on consent, eligibility, cooldowns, and budgets.
+  const friendAskCandidate: OpportunityCandidate | null =
+    detail !== null && detail.discoverable && detail.distance_m !== null && detail.bearing_deg !== null
+      ? {
+          id: detail.id,
+          display_name: detail.display_name,
+          distance_m: detail.distance_m,
+          bearing_deg: detail.bearing_deg,
+          walk_minutes: null,
+          closeness:
+            insight !== null && insight.level_source !== 'none'
+              ? { level: insight.level, level_source: insight.level_source }
+              : null,
+          context: 'Nearby and available for discovery',
+        }
+      : null;
+  const friendAskAdvice: CandidateAdvice =
+    detail !== null
+      ? (adviceById[detail.id] ?? { state: 'not_requested', advice: null, notice: null })
+      : { state: 'not_requested', advice: null, notice: null };
+
   return (
     <div className="app">
       <main className={screen === 'inbox' ? 'shell shell-wide' : 'shell'}>
@@ -422,6 +447,13 @@ export function App() {
             onRetryInsight={() => setInsightNonce((n) => n + 1)}
             onRequestReassessment={handleRequestReassessment}
             onSaveOverride={handleSaveOverride}
+            askCandidate={friendAskCandidate}
+            askAdvice={friendAskAdvice}
+            onAskAdvice={handleAsk}
+            onDismissAdvice={handleDismissCandidate}
+            onSnoozeAdvice={handleSnoozeCandidate}
+            onDeclineAdviceInvite={handleDeclineInvite}
+            onOpenAdviceRoute={() => setScreen('route')}
           />
         )}
         {screen === 'reconnect' && (
