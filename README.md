@@ -1,123 +1,228 @@
-# Near-Circle-Friend aka Ni-Ce-Friend
+# Near-Circle-Friend (Ni-Ce-Friend)
 
-**Proposed Facebook Messenger Feature • Meta Global AI Hackathon 2026**
+**A Proposed Facebook Messenger Feature**
 
 *Discover nearby friends. Reconnect in real life.*
 
-Near-Circle-Friend, also known as **Ni-Ce-Friend**, is a proximity-based social discovery application demonstrating how Facebook Messenger could help friends reconnect in the real world. Its Messenger-inspired interface combines an interactive proximity radar, geospatial discovery powered by PostgreSQL/PostGIS, and pedestrian navigation using OSRM and OpenStreetMap.
+Near-Circle-Friend helps existing friends rediscover opportunities for real-world connection. Its Messenger-inspired interface combines an interactive proximity radar (real PostgreSQL/PostGIS distance and bearing math over a simulated Metro Manila dataset) with **Reconnect Today** candidates and on-demand meetup advice genuinely inferred by Muse Spark 1.3 — never hardcoded, never simulated.
 
-Users can discover nearby participating friends, explore their proximity on the **Near-Circle** radar, and view actual walking routes with estimated travel times and step counts.
+> Independent prototype built for the **Meta Global AI Hackathon 2026**. Not an officially released, endorsed, or integrated Facebook or Messenger feature. All identities, conversations, and locations are simulated; the proximity math, routing, and AI inference are real.
 
-Ni-Ce-Friend is an independent concept prototype developed for the Meta Global AI Hackathon 2026. It is not an officially released, endorsed, or integrated Facebook or Messenger feature.
+## Section 1 — Quick Start for Hackathon Judges
 
-## Project Overview
+### Prerequisites
 
-| | |
+- Git.
+- Node.js 20 or newer.
+- npm (ships with Node.js).
+- Docker Desktop or Docker Engine, running.
+- Docker Compose v2 (included with Docker Desktop).
+- Your own authorized Meta Model API credentials (the judge's key — the repository never ships one).
+
+### Clone
+
+```powershell
+git clone https://github.com/orq0/near-circle-friend.git
+cd near-circle-friend
+```
+
+### Configure
+
+Create `.env` from the template with the platform-appropriate command:
+
+```powershell
+# Windows PowerShell
+Copy-Item .env.example .env
+
+# macOS / Linux
+cp .env.example .env
+```
+
+Then add your own credentials and confirm the AI budget. Required configuration:
+
+```dotenv
+MODEL_API_KEY=YOUR_OWN_META_API_KEY
+AI_CIRCLE_MAX_TOKENS=2048
+AI_CIRCLE_REASONING_EFFORT=low
+```
+
+- `MODEL_API_KEY` is **mandatory** for `npm run start:judges`: without it the bootstrap stops with setup instructions and starts nothing. Obtain it through authorized Meta Model API access. Never commit your `.env`.
+- `npm run start:judges` generates `.env` from `.env.example` when it is missing, and never overwrites an existing one.
+
+### Start
+
+```powershell
+npm run start:judges
+```
+
+This one command prepares application dependencies (`npm ci`, first run only), builds Docker images from the existing Dockerfiles, starts services with the existing Compose architecture (no volume resets, no destructive cleanup), runs the idempotent demo seed, and waits for real readiness: PostgreSQL health, API `/health`, frontend reachability, plus a 500 m discovery probe proving Coleen is seeded.
+
+### Open
+
+```text
+http://localhost:5173
+```
+
+The script prints the actual URLs on success and opens the app in your browser (best-effort). API health: `http://localhost:3001/health`.
+
+### Quick Demonstration
+
+1. Open Near-Circle-Friend.
+2. Explore the Radar — nearby opted-in friends appear as dots positioned by real distance and bearing.
+3. Switch between 500 m, 1 km, 2 km, and 5 km and watch the set grow (Coleen → Alex → Sam → Rhea).
+4. Open Reconnect Today — Coleen appears at all four distances.
+5. Explore Rhea's card at 5 km.
+6. Examine a friend profile: closeness tier, evidence, and provenance labels.
+7. Trigger Ask Meta AI for genuine Muse Spark 1.3 meetup advice (requires your `MODEL_API_KEY`).
+8. Open a walking route to see real OSRM pedestrian geometry (requires the one-time graph bootstrap below).
+
+Short troubleshooting and the developer commands live in [Section 9 — Developer Guide](#section-9--developer-guide); the full judges reference (auto vs manual setup, AI/routing status meanings) is preserved there as well.
+
+```mermaid
+flowchart TD
+    Clone["Clone repository"]
+    Key["Configure MODEL_API_KEY in .env"]
+    Start["Run npm run start:judges"]
+    Deps["Install dependencies (npm ci)"]
+    Docker["Prepare Docker images"]
+    DB["Start services + seed demo database"]
+    Ready{"PostgreSQL, API, and frontend ready?"}
+    Open["Open application"]
+    Fail["Clear error + guidance (exit 1)"]
+
+    Clone --> Key --> Start --> Deps --> Docker --> DB --> Ready
+    Ready -->|Yes| Open
+    Ready -->|No| Fail
+```
+
+## Section 2 — Customer Journey: From Online Friendship to Real-World Connection
+
+Screenshots captured from the running application (simulated identities, genuine proximity math and routing).
+
+### 01 — Discover
+
+Open Near-Circle from the Messenger-style inbox and see who is actually nearby.
+
+![Messenger inbox with the Near-Circle entry point](docs/screenshots/messenger-inbox.png)
+
+*The inbox you already know, with a Near-Circle entry point and an opt-in visibility toggle. Conversations are simulated; proximity comes from the live API.*
+
+### 02 — Explore
+
+Adjust the discovery radius and watch the radar respond with real PostGIS distances.
+
+![Near-Circle radar showing two friends within 1 km](docs/screenshots/near-circle-radar.png)
+
+*Dots are placed by true distance and bearing around Metro Manila demo locations. More friends appear as the radius grows — Coleen at 500 m, Alex at 1 km, Sam at 2 km, Rhea at 5 km.*
+
+### 03 — Reconnect
+
+Open Reconnect Today for the same eligible set as cards, or tap a dot for the friend view.
+
+![Friend card showing proximity and consent state](docs/screenshots/friend-details.png)
+
+*Each card shows verified proximity ("About 280 m away") and the consent boundary: precise destinations stay private without the applicable consent.*
+
+### 04 — Understand and Ask
+
+Review closeness context (tier, evidence, provenance), then optionally ask Meta AI.
+
+*Circle Insight reads the stored profile without invoking the model. Only the explicit **Ask Meta AI** action calls Muse Spark 1.3 — which returns a grounded suggestion or an honest abstention, never a fabricated plan.*
+
+### 05 — Connect
+
+Walk the real route and meet.
+
+![Walking route on OpenStreetMap with distance, time, and steps](docs/screenshots/walking-route.png)
+
+*OSRM pedestrian geometry on OpenStreetMap: 342 m on foot versus 280 m straight line, with time and step estimates. Nothing is sent anywhere; the invitation draft stays editable on screen.*
+
+```mermaid
+flowchart LR
+    Open2["Open Near-Circle"]
+    Radius["Select discovery radius"]
+    Discover["Discover eligible friends"]
+    Reconnect["Open Reconnect Today"]
+    Review["Review friend context"]
+    Ask["Request Meta AI advice (optional)"]
+    Decide{"Meet up?"}
+
+    Open2 --> Radius --> Discover --> Reconnect --> Review --> Ask --> Decide
+```
+
+*You stay in control: browsing never triggers inference, suggestions are low-pressure, and declining, snoozing, or dismissing a candidate is always one tap away.*
+
+## Section 3 — What Is Near-Circle-Friend?
+
+Online friendships go quiet not from lack of care but lack of occasion: you never learn that a close friend is ten minutes away. Proximity alone is not enough either — a nearby stranger is not a reason to meet, while a meaningful friendship deserves better than a generic "people near you" list.
+
+Near-Circle-Friend works only with **existing friendships**, and only when both sides opt in. It combines verified closeness (who matters to you, privately estimated) with verified proximity (who is actually close right now), then lets an AI assistant help with the *how* — a good moment, a simple plan, help finding the words — while both people keep full control.
+
+| Passive social connections | The Near-Circle experience |
 |---|---|
-| Official project identity | Near-Circle-Friend aka Ni-Ce-Friend |
-| Short product name | Ni-Ce-Friend |
-| Proximity discovery feature | Near-Circle |
-| Repository | near-circle-friend |
-| Positioning | Proposed Facebook Messenger Feature |
-| Event | Meta Global AI Hackathon 2026 |
-| Tagline | *Discover nearby friends. Reconnect in real life.* |
+| Endless feed of distant updates | The friends who are actually nearby, right now |
+| "People you may know" strangers | Only approved, opted-in, existing friends |
+| Pressure to respond instantly | Low-pressure, snoozable, dismissible suggestions |
+| Opaque ranking | Provenance labels on every AI output |
+| Location shared by default | Discovery off until you enable it; precise spots stay private |
 
-**Project references:** [`Near-Circle_Dev_Plan.md`](./Near-Circle_Dev_Plan.md) is the authoritative technical specification; [`Near-Circle_Dev_Plan_visual.pdf`](./Near-Circle_Dev_Plan_visual.pdf) is the visual and UX reference.
+## Section 4 — Core Features
 
-## Key Features
+### Nearby Friends Radar
 
-### Messenger-Inspired Experience
+You at the center; eligible friends as dots placed by real distance and bearing. Four radii (500 m, 1 km, 2 km, 5 km), proximity rings, tap-to-inspect, and an honest empty state when nobody is in range.
 
-- Familiar messaging interface with simulated conversations.
-- Functional conversation search that filters the simulated chat list.
-- A Near-Circle entry point in the inbox header, alongside the main **Open Near-Circle** action.
-- Responsive desktop and mobile presentation.
+### Reconnect Today
 
-### Interactive Proximity Radar
+The same eligible set as deterministic candidate cards — Coleen at every distance, Rhea joining at 5 km — each with stored closeness context and an optional **Ask Meta AI** action. Browsing never invokes the model.
 
-- The current user sits at the center; nearby opted-in friends appear as red dots.
-- Concentric proximity rings, a configurable discovery radius (500 m / 1 km / 2 km / 5 km), and friend selection.
-- Friend dots are positioned from real geographic distance and bearing calculations.
-- Opt-in visibility controls: turning Near-Circle off pauses discovery.
+### Social Context and Reconnection Signals
 
-### Real Geospatial Discovery
+Circle Insight shows the persisted closeness tier (1–5), evidence quality, rationale, trend, and provenance (`AI estimate`, `Demo profile`, `Your choice`, or an honest `Not enough information`). Reads never trigger reassessment; overrides always win.
 
-- PostgreSQL/PostGIS proximity queries using `ST_DWithin` over geography points.
-- Geodesic distance (`ST_Distance`) and bearing (`ST_Azimuth`) calculations with spatial indexing.
-- Friend-relationship eligibility filtering: only approved, opted-in friends with fresh locations are returned.
-- A simulated Metro Manila demo dataset (identities and conversations are fictional; the geospatial math is real).
+### AI-Generated Meetup Advice
 
-### Pedestrian Navigation
+On-demand Muse Spark 1.3 suggestions with pre- and post-inference eligibility checks, consent gates, quiet hours, rate limits, short-lived caching, and editable invitation drafts that are never sent.
 
-- OSRM pedestrian (foot profile) routing over a Metro Manila OpenStreetMap graph.
-- Interactive Leaflet map rendering the actual route geometry.
-- Walking distance, estimated duration, and estimated step counts from a configurable stride.
-- On-foot distance is always shown alongside the straight-line distance — never conflated.
+### Privacy and Eligibility Controls
 
-### AI Circle Intelligence
+Visibility toggle, per-friend discovery state, location freshness, approved-friendship checks, dismiss/snooze suppression, and separate analysis/advice consents that purge derived data on revocation.
 
-- Friendship closeness estimates from coarse, consented aggregates (tiers 1–5 plus honest "Not enough information").
-- **Circle Insight** on each friend card: level, evidence quality, rationale, trend, and provenance.
-- **Reconnect today** screen with deterministic nearby candidates and per-friend **Ask Meta AI**.
-- Editable invitation drafts that are never sent; low-pressure suggestions only.
-- Strictly opt-in: analysis and advice consents default off; revoking purges derived data.
-- Every AI surface carries an explicit provenance label — live estimate, recent result, demo profile, or your choice.
+### Demo Profiles and Synthetic Availability
 
-## Application Screenshots
+Clearly labeled seed fixtures (including fictional Asia/Manila availability windows for the judging roster, used as model input context only) keep the demo meaningful without real user data.
 
-Captured from the running application (Messenger-inspired interface, live PostGIS radar, and real OSRM routing):
+### Realistic Profile Pictures
 
-### Messenger Experience
+Fictional demo avatars with initial fallbacks across inbox, radar, cards, and panels.
 
-![Ni-Ce-Friend Messenger Interface](docs/screenshots/messenger-inbox.png)
+### Optional Pedestrian Routing
 
-### Interactive Proximity Radar
+OSRM foot-profile routes over Metro Manila OpenStreetMap data with distance, duration, and step estimates — reported `not-ready` (never faked) until the one-time graph bootstrap runs.
 
-![Ni-Ce-Friend Near-Circle Radar](docs/screenshots/near-circle-radar.png)
-
-### Nearby Friend Discovery
-
-![Ni-Ce-Friend Friend Details](docs/screenshots/friend-details.png)
-
-### Pedestrian Navigation
-
-![Ni-Ce-Friend Walking Route](docs/screenshots/walking-route.png)
-
-## How Ni-Ce-Friend Works
-
-1. The Messenger-inspired frontend (`apps/web`) calls the Fastify API (`apps/api`).
-2. For discovery, the API runs PostGIS queries in PostgreSQL: it computes the demo user's position, finds approved friends with Near-Circle enabled and fresh locations within the radius, and returns each friend's distance and bearing.
-3. The frontend places those friends as dots on the Near-Circle radar.
-4. When a friend is selected, the API asks the OSRM pedestrian router for a walking route over the Metro Manila road/walkway network and returns the route geometry, distance, and duration.
-5. Leaflet renders the route on OpenStreetMap; the UI adds estimated steps (distance ÷ stride) and compares walking distance with the straight line.
-
-## Technical Architecture
-
-| Component | Technology |
-|---|---|
-| Frontend | React 19, TypeScript, Vite |
-| Backend | Fastify, TypeScript |
-| Database | PostgreSQL 16 |
-| Geospatial engine | PostGIS 3.4 |
-| Pedestrian routing | OSRM (foot profile) |
-| Map rendering | Leaflet |
-| Map data | OpenStreetMap |
-| Infrastructure | Docker Compose |
+## Section 5 — System Architecture
 
 ```mermaid
 flowchart LR
     subgraph Client["Browser"]
-        UI["Messenger-inspired frontend<br/>(React + Vite)"]
+        UI["Messenger-inspired frontend<br/>(React 19 + Vite + TypeScript)"]
         MAP["Leaflet map<br/>(OpenStreetMap tiles)"]
     end
     subgraph Services["Docker Compose stack"]
-        API["Fastify API"]
-        DB[("PostgreSQL + PostGIS")]
-        OSRM["OSRM pedestrian router<br/>(foot profile, Metro Manila graph)"]
+        API["Fastify API<br/>(proximity, advisor, consent)"]
+        DB[("PostgreSQL 16 + PostGIS 3.4<br/>(ST_DWithin, ST_Distance, ST_Azimuth)")]
+        OSRM["Optional OSRM pedestrian router<br/>(foot profile, routing profile-gated)"]
+        SEED["Idempotent demo seed<br/>(npm run db:seed)"]
+    end
+    subgraph Model["Meta Model API (external)"]
+        SPARK["Muse Spark 1.3<br/>(strict JSON, 2048 tokens, low effort)"]
     end
     UI -->|"/api (Vite proxy)"| API
-    API -->|"proximity: ST_DWithin / ST_Distance / ST_Azimuth"| DB
-    API -->|"walking route"| OSRM
+    API -->|"verified proximity"| DB
+    SEED -->|"demo users, signals, profiles"| DB
+    API -->|"walking route (when graph ready)"| OSRM
+    API -->|"eligible context only, on explicit Ask"| SPARK
+    SPARK -->|"validated suggestion or abstention"| API
     API -->|"route geometry, distance, duration"| UI
     MAP --- UI
 ```
@@ -125,83 +230,108 @@ flowchart LR
 - **PostGIS** determines which eligible friends are nearby.
 - **OSRM** calculates pedestrian routes over actual road and walkway networks.
 - **Leaflet** visualizes routes on OpenStreetMap.
+- **Muse Spark 1.3** is invoked only on explicit request, with aliased bucketed facts and a strict JSON contract; every output is validated before storage or display.
 - The **frontend** presents discovery and navigation through a Messenger-inspired interface.
 
-Near-Circle is self-contained: it does not depend on unrelated repositories or routing services.
+Near-Circle is self-contained: it does not depend on unrelated repositories or routing services, and it never contacts production Facebook or Messenger infrastructure.
 
-## Installation and Setup
+## Section 6 — How Meta AI Works
 
-### Prerequisites
+Near-Circle-Friend does not hardcode AI recommendations. When you explicitly ask, the backend assembles factual context from eligible user information and invokes the actual Meta Model API — then validates the structured reply before anything is stored or shown.
 
-- Windows 11 with PowerShell 7 (`pwsh`) or Windows PowerShell 5.1.
-- Node.js 20+ and npm.
-- Docker Desktop (for the Compose stack; the web and API can also run natively).
+```mermaid
+flowchart TD
+    Ask2["User taps Ask Meta AI"]
+    Gate["Backend verifies consent, eligibility, quiet hours"]
+    Allow{"Eligible?"}
+    Build["Build aliased, bucketed context (no raw private data)"]
+    Infer["Muse Spark 1.3 inference (strict JSON)"]
+    Validate{"Response valid?"}
+    Show["Show suggestion or honest abstention"]
+    Deny["Explain honestly (no AI call made)"]
 
-### Quickstart
+    Ask2 --> Gate --> Allow
+    Allow -->|Yes| Build --> Infer --> Validate
+    Allow -->|No| Deny
+    Validate -->|Yes| Show
+    Validate -->|No| Deny
+```
+
+Deterministic application checks (consent, eligibility, budgets, cache) always run first; generative inference runs last and only on demand. Failure paths — ineligible friend, missing consent, quiet hours, exhausted budget, unreachable model, invalid response — each render as their own honest UI state.
+
+- Model: `muse-spark-1.3`.
+- Completion budget: 2048 by default.
+- Reasoning effort: low by default.
+- Strict structured outputs with response validation.
+- Genuine live inference (presence of a key is not proof — only a real call is).
+- Synthetic demo data is input context only, never presented as a live result.
+
+No credentials or internal reasoning content are ever displayed, and no request is guaranteed a positive recommendation — `later` and `insufficient_context` are first-class outcomes.
+
+## Section 7 — Privacy, Consent, and Discovery Eligibility
+
+A friend appears only when every gate agrees. The proximity gates are enforced together inside the backend query; the advice path adds its own pre- and post-inference rechecks.
+
+```mermaid
+flowchart TD
+    F["Approved friendship?"]
+    V["Discovery enabled for them?"]
+    L["Location fresh?"]
+    R["Within selected radius?"]
+    Disp["Eligible for display (radar, cards)"]
+    Supp{"Dismissed or snoozed?"}
+    Rec["Reconnect Today candidate"]
+    Hide["Hidden until snooze lapses or dismiss is revoked"]
+
+    F --> V --> L --> R --> Disp --> Supp
+    Supp -->|No| Rec
+    Supp -->|Yes| Hide
+```
+
+- **Approved friendship** — pending, blocked, and unknown friendships are invisible.
+- **Discovery visibility** — each user opts in; turning Near-Circle off pauses everything.
+- **Location freshness** — stale or missing locations never place a dot (30-day demo window).
+- **Proximity eligibility** — real PostGIS distance within the selected radius.
+- **Reconnect suppression** — dismiss hides until revoked; snooze hides until expiry; a declined invite only shapes future advice, never candidacy.
+- **Quiet hours and consents** — advice additionally requires advice consent, out-of-quiet-hours timing, and per-user/per-friend budgets; revoking analysis or advice consent purges derived data immediately.
+
+## Section 8 — Technology Stack
+
+| Layer | Technology | Purpose |
+|---|---|---|
+| Frontend | React 19, TypeScript, Vite | Messenger-inspired UI, radar, cards, panels |
+| Backend | Fastify, TypeScript | Health, proximity, friends, routes, AI advisor |
+| Geospatial | PostgreSQL 16, PostGIS 3.4 | Proximity queries, distance, bearing |
+| AI | Meta Model API, Muse Spark 1.3 | On-demand meetup advice with strict validation |
+| Routing | OSRM foot profile (optional) | Pedestrian geometry, duration, steps |
+| Maps | Leaflet, OpenStreetMap | Route rendering (external tiles) |
+| Infrastructure | Docker Compose | Local orchestration of db, api, web (+ routing profile) |
+
+## Section 9 — Developer Guide
+
+### Developer setup
 
 ```powershell
 git clone https://github.com/orq0/near-circle-friend.git
 cd near-circle-friend
-
-# Optional environment overrides (defaults already work)
-Copy-Item .env.example .env
-
-# Dependencies
+Copy-Item .env.example .env   # cp .env.example .env on macOS/Linux
 npm install
-
-# Seed the Metro Manila demo dataset into the database (idempotent)
-npm run db:seed
-
-# Start the project services
-npm run startall
-
-# Open the app
-# http://localhost:5173/
+npm run db:seed               # idempotent Metro Manila demo dataset
+npm run startall              # Compose stack with real readiness waits
 ```
 
-### Quick Start for Hackathon Judges
+### Commands
 
-One command prepares everything (prerequisites below must already be installed):
+| Command | Effect |
+|---|---|
+| `npm run startall` | Start the Compose stack and wait for real readiness; enables the routing profile automatically once the graph exists |
+| `npm run start:judges` | Judge bootstrap: install, env, images, seed, and readiness in one command |
+| `npm run status` | Read-only health of every service (never prints secrets) |
+| `npm run stopall` | Stop project services only; preserves data and graphs |
+| `npm run dev:api` | Native fallback: Fastify with reload on <http://localhost:3001> |
+| `npm run dev:web` | Native fallback: Vite with HMR on <http://localhost:5173> |
 
-```powershell
-git clone https://github.com/orq0/near-circle-friend.git
-cd near-circle-friend
-npm run start:judges
-```
-
-What the script installs and prepares automatically:
-
-- Application dependencies via `npm ci` (first run only; reused afterwards).
-- A local `.env` generated from `.env.example` when missing (an existing `.env` is never overwritten).
-- Docker images via `docker compose build` using the existing Dockerfiles.
-- Service startup via the existing Compose architecture (no volume resets, no destructive cleanup).
-- Idempotent demo seeding (`npm run db:seed`; safe to re-run, never duplicates records).
-- Readiness checks: PostgreSQL health, API `/health`, frontend reachability, and a 500 m discovery probe proving Coleen is seeded.
-
-What you must provide yourself (the script never installs or provisions these):
-
-- Node.js 20+ and npm — https://nodejs.org/
-- Docker Desktop (or Docker Engine) running — https://www.docker.com/products/docker-desktop/
-- Your own authorized Meta Model API key for live inference: set `MODEL_API_KEY=<YOUR_OWN_META_API_KEY>` in `.env`. The key is mandatory — `npm run start:judges` stops with setup instructions when it is missing (nothing starts, nothing is simulated as `meta_live`). The repository never ships a credential and `.env` is never committed.
-- Optional pedestrian-routing data (see "One-time pedestrian graph bootstrap" below); routing reports `not-ready` without it and the core app is unaffected.
-
-On success the script prints the actual URLs (defaults: app http://localhost:5173/, API http://localhost:3001/health), the AI status (Configured — key presence only; authentication is proven solely by a real inference call such as Ask Meta AI), and the routing status, and opens the app in your browser (best-effort).
-
-Demo in 30 seconds: open Radar → select 500 m → open Reconnect Today (Coleen appears) → select a friend dot → ask Meta AI for a meetup suggestion.
-
-Stop services any time (volumes preserved):
-
-```powershell
-npm run stopall
-```
-
-Troubleshooting:
-
-- `Docker Engine running [FAIL]` — install/start Docker Desktop, then re-run.
-- A port conflict — stop the unrelated process or set `WEB_PORT`, `API_PORT`, or `POSTGRES_PORT` in `.env`.
-- `Demo users seeded [FAIL]` — run `npm run db:seed` manually and check the API logs.
-- `Live AI credentials configured [FAIL]` — add your own `MODEL_API_KEY` to `.env` (never commit it) and re-run; the bootstrap changes nothing until the key is present.
-- Repeat runs are safe: healthy services are reused, seeding is idempotent, and no volumes are ever reset.
+Default URLs: web <http://localhost:5173/>, API health <http://localhost:3001/health>, router <http://localhost:5002>, PostgreSQL `localhost:5433`.
 
 ### One-time pedestrian graph bootstrap
 
@@ -215,49 +345,7 @@ npm run status     # expect near-circle-routing-walk: healthy
 
 Data provenance: Metro Manila extract from BBBike (© OpenStreetMap contributors, ODbL). See [`routing/README.md`](./routing/README.md) for details, the direct API test, and the Geofabrik fallback.
 
-## Running the Application
-
-| Command | Effect |
-|---|---|
-| `npm run startall` | Start the Compose stack and wait for real readiness; enables the routing profile automatically once the graph exists |
-| `npm run status` | Read-only health of every service (never prints secrets) |
-| `npm run stopall` | Stop project services only; preserves data and graphs |
-| `npm run dev:api` | Native fallback: Fastify with reload on <http://localhost:3001> |
-| `npm run dev:web` | Native fallback: Vite with HMR on <http://localhost:5173> |
-
-Default URLs: web <http://localhost:5173/>, API health <http://localhost:3001/health>, router <http://localhost:5002>, PostgreSQL `localhost:5433`.
-
-## Demo Walkthrough
-
-For hackathon judges — helping friends reconnect through proximity-aware social discovery:
-
-1. Open Ni-Ce-Friend's Messenger-inspired interface at <http://localhost:5173>.
-2. Browse the simulated conversations (Coleen, Alex, Sam).
-3. Launch **Near-Circle** from the header or the **Open Near-Circle** button.
-4. Make sure proximity discovery is activated (the visibility toggle in the inbox).
-5. Watch nearby friends appear as red dots on the radar — Coleen at ~280 m at the default 1 km radius.
-6. Adjust the discovery radius (500 m → 1 km → 2 km → 5 km) and watch dots appear (Alex, Sam, then Rhea).
-7. Select a nearby friend dot.
-8. Review the proximity information (real computed distance).
-9. Open **View walking route** for pedestrian navigation.
-10. See the real OSRM walking route on OpenStreetMap with distance, ETA, and estimated steps.
-11. Return to the radar or the Messenger inbox with the back controls.
-
-## AI Circle Intelligence
-
-Prototype powered by Muse Spark 1.3 via Meta Model API; proposed production integration would use native Meta AI subject to Meta's first-party approval and support.
-
-AI Circle Intelligence adds friendship closeness and low-pressure meetup guidance on top of discovery — without ever replacing the deterministic PostGIS/OSRM facts. Closeness comes from coarse consented aggregates only (known-for, recency, frequency, reciprocity, confirmed meetups, declared values). No message bodies, post text, personal identifiers beyond the demo pair, or precise locations ever reach the model: its prompts contain aliased, bucketed facts with a strict JSON contract, and every output is validated before storage or display.
-
-**Consent and honesty model.** New analysis and advice consents default off. Reassessments run only for approved initial or materially changed and consented friendships, with a 14-day cooldown, hysteresis against signal flicker, and a bounded retry budget. Advice requires advice consent, eligibility rechecks before and after inference, and per-user/per-friend rate limits. Turning consent off immediately cancels queued work and purges derived suggestions (manual tiers are never auto-replaced and survive revocation). Map, radar, and walking routes keep working when the model is unreachable.
-
-**Provenance labels.** `AI estimate` = persisted from live Muse Spark inference; `Recent AI suggestion`/`Live AI suggestion` = freshly computed or cached results; `Demo profile`/`Demo suggestion` = clearly labeled seed fixtures; `Your choice` = manual override (always displayed first); `Not enough information` = abstention, never a guess.
-
-**Setup.** The feature is enabled by default and degrades honestly without a key (reads work; advice returns labeled demo results). For live inference, set `MODEL_API_KEY` in your (never committed) `.env` — see the `AI Circle Intelligence` section of [`.env.example`](./.env.example) for the model name, base URL, timeout, cooldown, cache TTL, and budget knobs. The API container picks these up through Compose automatically.
-
-**Demo fixtures.** The seed adds Jamie (frequent recent contact, beyond 5 km so existing discovery expectations are unchanged) and Taylor (discovery opt-out), plus Alex's persisted Level-4 demo profile and Sam's sparse "not enough information" profile. Enable the two consents in **AI Circle settings**, open **Reconnect today**, and judge the abstain/suggest flows end to end keyless.
-
-## API Endpoints
+### API endpoints
 
 | Endpoint | Purpose |
 |---|---|
@@ -279,20 +367,21 @@ AI Circle Intelligence adds friendship closeness and low-pressure meetup guidanc
 | `POST /ai-circle/feedback` | Dismiss / snooze / declined-invite feedback |
 | `GET /ai-circle/usage` | Privacy-safe inference counters (requests, cache, tokens, rate limits) |
 
-## Project Structure
+### Project structure
 
 ```text
 apps/web/          # React + Vite + TS Messenger-inspired UI (mock conversations in src/mockData.ts)
 apps/api/          # Fastify API: health, nearby/visibility/location/friends/route (PostGIS + OSRM)
 db/init/           # PostGIS extension + schema
 db/seed/           # Idempotent Metro Manila demo dataset (npm run db:seed)
+db/cleanup/        # One-shot demo-data corrections (explicit host execution only)
 routing/           # OSRM boundary: README, data/ (graph artifacts), prepare-graph.ps1
-scripts/           # startall.ps1 / stopall.ps1 / status.ps1 (+ common.ps1)
+scripts/           # startall.ps1 / stopall.ps1 / status.ps1 (+ common.ps1), judges.mjs bootstrap
 docs/              # Specs and screenshots
 docker-compose.yml # Four project-owned services
 ```
 
-## Testing and Verification
+### Testing and verification
 
 ```powershell
 npm run typecheck   # TypeScript across API and web workspaces
@@ -309,7 +398,11 @@ $env:RUN_INTEGRATION_TESTS='1'; npm --workspace apps/api run test:integration   
 
 See [`.env.example`](./.env.example) for configurable ports, credentials, routing endpoints, and map-tile URLs.
 
-## Known Limitations
+### Demo fixtures
+
+The seed adds Jamie (frequent recent contact, beyond 5 km so existing discovery expectations are unchanged) and Taylor (discovery opt-out), plus Alex's persisted Level-4 demo profile and Sam's sparse "not enough information" profile. Enable the two consents in **AI Circle settings**, open **Reconnect today**, and judge the abstain/suggest flows end to end keyless.
+
+### Known limitations
 
 - All identities, conversations, friendships, and demo locations are simulated. There is no Facebook login, no real friend graph, and no real messaging.
 - The demo context is a single local user (`you` near Rizal Park); there is no authentication system.
@@ -319,38 +412,19 @@ See [`.env.example`](./.env.example) for configurable ports, credentials, routin
 - Location freshness is demo-driven (30-day window); consent checks are enforced in the API but there is no real account system behind them.
 - AI assessments and advice bill against your Meta Model API key and rate limits; without a key the feature serves stored fixtures and deterministic labeled demo advice. AI outputs are suggestions grounded in disclosed facts, not measured truth — manual tiers always win.
 
-## Hackathon Development and Attribution
-
-- **Near-Circle-Friend aka Ni-Ce-Friend** is an independent hackathon project built for the Meta Global AI Hackathon 2026. The proposed Messenger integration is conceptual; this is not an officially released Facebook or Messenger feature, and no Meta endorsement is claimed.
-- Social identities, conversations, and friendships in the demo are simulated. Proximity detection uses actual PostgreSQL/PostGIS computations; pedestrian navigation uses actual OSRM routing over OpenStreetMap data.
-- Map data © OpenStreetMap contributors, available under the [ODbL](https://www.openstreetmap.org/copyright). The Metro Manila extract is sourced from BBBike; see [`routing/README.md`](./routing/README.md) for provenance and the fallback source.
-- The project was developed across phases: (1) Messenger-inspired foundation and stack, (2) live PostGIS proximity radar, (3) OSRM pedestrian routing, (4) Messenger-fidelity presentation. Phases in progress: API hardening/validation, and submission packaging.
-- Any future integration with Facebook platforms would depend on the relevant APIs, permissions, and approvals.
-
-## Future Development
-
-### AI-Powered Friendship Compass (proposed)
-
-A proposed Meta AI capability that estimates friendship closeness from authorized interaction signals:
-
-- Analyze consented interaction histories (initially simulated for the prototype).
-- Estimate friendship-affinity levels from interaction frequency, recency, and reciprocity.
-- Combine friendship affinity with walking proximity.
-- Generate contextual meetup suggestions.
-
-Meta AI cannot freely access private Messenger conversations or complete Facebook friendship data; this is future functionality, not implemented in the prototype.
-
-### Additional Planned Features
-
-- Approved Facebook authentication and permitted platform integration.
-- Mutual meetup invitations and enhanced location-sharing controls.
-- Improved walking-time predictions and additional geographic coverage.
-- Hardened API validation, permission enforcement, and lifecycle coverage.
-
-## Troubleshooting
+### Troubleshooting
 
 - **Router shows `not-ready`:** Expected until the graph bootstrap has run; core services start without OSRM. See the bootstrap section above.
 - **Docker missing:** `startall` reports an actionable error; use `npm run dev:api` and `npm run dev:web` for native web/API development.
 - **Port conflict:** Configure `WEB_PORT`, `API_PORT`, `POSTGRES_PORT`, or `ROUTING_WALK_PORT` in `.env`. Port 5001 is avoided deliberately (commonly occupied by unrelated OSRM instances); the project router uses 5002.
 - **npm `EPERM` on cache (locked-down profiles):** Run `$env:npm_config_cache = "$PWD\.npm-cache"; npm install`.
 - **Tile outage:** Map tiles are external; `npm run status` reports their reachability as `unknown` when offline, and the app never misrepresents unavailable routing as working.
+
+## Section 10 — Additional Documentation Links
+
+- [`routing/README.md`](./routing/README.md) — pedestrian graph bootstrap, direct API test, Geofabrik fallback.
+- [`.env.example`](./.env.example) — every knob: ports, credentials, model, timeouts, budgets, routing endpoints, tiles.
+- [`docs/screenshots/`](./docs/screenshots/) — application screenshots used above.
+- [`docs/Near-Circle-Friend_Mission_Statement_Visual.pdf`](./docs/Near-Circle-Friend_Mission_Statement_Visual.pdf) — mission statement (visual).
+
+*Attribution: Near-Circle-Friend is an independent hackathon project built for the Meta Global AI Hackathon 2026. The proposed Messenger integration is conceptual; this is not an officially released Facebook or Messenger feature, and no Meta endorsement is claimed. Map data © OpenStreetMap contributors (ODbL); the Metro Manila extract is sourced from BBBike. Any future integration with Facebook platforms would depend on the relevant APIs, permissions, and approvals.*
