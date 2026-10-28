@@ -3,6 +3,9 @@
 // judge entry point is verifiable on any host with Node.js 20+.
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   buildUpArgs,
   checkSeedNearby,
@@ -11,9 +14,13 @@ import {
   mergeEnv,
   nodeSatisfies,
   parseEnvText,
+  requireApiKey,
   routingReadiness,
   validateAiConfig,
 } from './judges.mjs';
+
+const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const JUDGES_SRC = readFileSync(join(REPO_ROOT, 'scripts', 'judges.mjs'), 'utf8');
 
 describe('judge bootstrap logic', () => {
   it('parses dotenv text like the PowerShell env reader', () => {
@@ -114,5 +121,51 @@ describe('judge bootstrap logic', () => {
     assert.equal(coreReady({ db: true, api: true, web: false }), false);
     assert.equal(coreReady({ db: true, api: false, web: true }), false);
     assert.equal(coreReady({ db: false, api: true, web: true }), false);
+  });
+
+  it('fails the credential gate with actionable guidance when the key is absent', () => {
+    const missing = requireApiKey({ MODEL_API_KEY: '' });
+    assert.equal(missing.ok, false);
+    const guidance = missing.guidance.join('\n');
+    assert.match(guidance, /MODEL_API_KEY/);
+    assert.match(guidance, /\.env/);
+    assert.match(guidance, /re-run: npm run start:judges/);
+    const whitespace = requireApiKey({ MODEL_API_KEY: '   ' });
+    assert.equal(whitespace.ok, false);
+    const present = requireApiKey({ MODEL_API_KEY: 'operator-supplied-key' });
+    assert.equal(present.ok, true);
+    assert.deepEqual(present.guidance, []);
+    // Guidance must never echo a credential value back.
+    assert.ok(!guidance.includes('operator-supplied-key'));
+  });
+
+  it('defaults Compose to the 2048-token budget with no silent 512 fallback', () => {
+    const compose = readFileSync(join(REPO_ROOT, 'docker-compose.yml'), 'utf8');
+    assert.match(compose, /AI_CIRCLE_MAX_TOKENS: "\$\{AI_CIRCLE_MAX_TOKENS:-2048\}"/);
+    assert.match(compose, /META_MODEL_NAME: "\$\{META_MODEL_NAME:-muse-spark-1\.3\}"/);
+    assert.ok(!compose.includes(':-512'), 'no 512 fallback may remain in Compose');
+  });
+
+  it('never prints credential values and never touches an existing .env', () => {
+    for (const line of JUDGES_SRC.split('\n')) {
+      if (line.includes('MODEL_API_KEY') && /log\(|step\(|stdout/.test(line)) {
+        assert.ok(!line.includes('env.'), `output line must not interpolate the key: ${line.trim()}`);
+      }
+    }
+    assert.match(JUDGES_SRC, /if\s*\(\s*!existsSync\(ENV_FILE\)\s*\)/);
+  });
+
+  it('contains no destructive operations (safe repeated execution)', () => {
+    assert.ok(!JUDGES_SRC.includes('down -v'));
+    assert.ok(!JUDGES_SRC.includes('--volumes'));
+    assert.ok(!JUDGES_SRC.includes('TRUNCATE'));
+    assert.ok(!JUDGES_SRC.includes('system prune'));
+    assert.ok(!JUDGES_SRC.includes('rm -rf'));
+  });
+
+  it('points judge instructions at the official repository only', () => {
+    const readme = readFileSync(join(REPO_ROOT, 'README.md'), 'utf8');
+    assert.ok(readme.includes('https://github.com/orq0/near-circle-friend'));
+    assert.ok(!readme.includes('siamlabs'), 'no stale repository references in setup docs');
   });
 });

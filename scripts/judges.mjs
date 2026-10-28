@@ -135,7 +135,7 @@ export function validateAiConfig(env) {
   if (tokens !== '2048') {
     problems.push({
       level: 'warn',
-      message: `AI_CIRCLE_MAX_TOKENS is '${tokens || '(unset)'}' (intended '2048'; the Compose fallback is 512).`,
+      message: `AI_CIRCLE_MAX_TOKENS is '${tokens || '(unset)'}' (intended '2048'; values below 2048 risk truncated Muse Spark replies).`,
     });
   }
   const reasoning = env.AI_CIRCLE_REASONING_EFFORT ?? '';
@@ -167,6 +167,27 @@ export function checkSeedNearby(body) {
 /** Core readiness verdict: routing is optional and never blocks success. */
 export function coreReady({ db, api, web }) {
   return db === true && api === true && web === true;
+}
+
+/**
+ * Mandatory credential gate: live AI recommendations require the operator's
+ * own authorized key. Returns actionable setup guidance when absent. Only
+ * presence is checked here — never the value, which is never printed.
+ */
+export function requireApiKey(env) {
+  const configured = (env.MODEL_API_KEY ?? '').trim() !== '';
+  return {
+    ok: configured,
+    guidance: configured
+      ? []
+      : [
+          'Live AI recommendations require your own authorized Meta Model API key.',
+          'The repository never ships a credential: obtain one through authorized',
+          'Meta Model API access, then add this line to your local .env file:',
+          '  MODEL_API_KEY=<YOUR_OWN_META_API_KEY>',
+          'Never commit your .env file. Then safely re-run: npm run start:judges',
+        ],
+  };
 }
 
 // ---- Impure helpers (thin wrappers; stages below own the policy) -----------
@@ -371,6 +392,17 @@ async function main() {
   const ai = validateAiConfig(env);
   for (const problem of ai.problems) warn('AI configuration', problem.message);
 
+  // ---- 4b. Mandatory credential gate (fail fast, before any heavy work) ----
+  const credential = requireApiKey(env);
+  if (!credential.ok) {
+    step(false, 'Live AI credentials configured', 'MODEL_API_KEY is missing');
+    for (const line of credential.guidance) log(`  ${line}`);
+    log('No services were started or modified; no live-AI readiness is claimed.');
+    process.exitCode = 1;
+    return;
+  }
+  step(true, 'Live AI credentials configured', 'key present (presence only; see summary)');
+
   // ---- 5. Ports ----
   const ports = [
     ['Web', Number(env.WEB_PORT) || 5173],
@@ -507,13 +539,8 @@ async function main() {
   log(' Near-Circle-Friend is ready!');
   log('================================================');
   log(`AI Provider: Meta Muse Spark 1.3 (${ai.model || 'muse-spark-1.3'})`);
-  if (ai.keyConfigured) {
-    log('AI Status: Configured (live inference enabled)');
-  } else {
-    log('AI Status: Not configured (keyless demo mode; stored profiles + labeled demo advice)');
-    log('  To enable live inference, set MODEL_API_KEY in .env from authorized');
-    log('  Meta Model API access, then re-run: npm run start:judges');
-  }
+  log('AI Status: Configured (key present; authentication is proven only by a');
+  log('  real inference call, e.g. Ask Meta AI in the app — never by this check)');
   log(`Routing: ${graph.ready ? 'Available (pedestrian graph detected)' : 'Not configured (no graph; see routing/README.md)'}`);
   log('');
   log(`Application: ${webUrl}`);

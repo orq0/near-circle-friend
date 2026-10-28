@@ -140,7 +140,7 @@ Near-Circle is self-contained: it does not depend on unrelated repositories or r
 ### Quickstart
 
 ```powershell
-git clone https://github.com/siamlabs/near-circle-friend.git
+git clone https://github.com/orq0/near-circle-friend.git
 cd near-circle-friend
 
 # Optional environment overrides (defaults already work)
@@ -182,10 +182,10 @@ What you must provide yourself (the script never installs or provisions these):
 
 - Node.js 20+ and npm — https://nodejs.org/
 - Docker Desktop (or Docker Engine) running — https://www.docker.com/products/docker-desktop/
-- Authorized Meta Model API access for live inference: set `MODEL_API_KEY` in `.env`. Without a key the app still starts in keyless demo mode (stored profiles plus clearly labeled demo advice; nothing is simulated as `meta_live`).
+- Your own authorized Meta Model API key for live inference: set `MODEL_API_KEY=<YOUR_OWN_META_API_KEY>` in `.env`. The key is mandatory — `npm run start:judges` stops with setup instructions when it is missing (nothing starts, nothing is simulated as `meta_live`). The repository never ships a credential and `.env` is never committed.
 - Optional pedestrian-routing data (see "One-time pedestrian graph bootstrap" below); routing reports `not-ready` without it and the core app is unaffected.
 
-On success the script prints the actual URLs (defaults: app http://localhost:5173/, API http://localhost:3001/health), the AI status (Configured / Not configured), and the routing status, and opens the app in your browser (best-effort).
+On success the script prints the actual URLs (defaults: app http://localhost:5173/, API http://localhost:3001/health), the AI status (Configured — key presence only; authentication is proven solely by a real inference call such as Ask Meta AI), and the routing status, and opens the app in your browser (best-effort).
 
 Demo in 30 seconds: open Radar → select 500 m → open Reconnect Today (Coleen appears) → select a friend dot → ask Meta AI for a meetup suggestion.
 
@@ -200,7 +200,7 @@ Troubleshooting:
 - `Docker Engine running [FAIL]` — install/start Docker Desktop, then re-run.
 - A port conflict — stop the unrelated process or set `WEB_PORT`, `API_PORT`, or `POSTGRES_PORT` in `.env`.
 - `Demo users seeded [FAIL]` — run `npm run db:seed` manually and check the API logs.
-- Live AI unavailable — set `MODEL_API_KEY` in `.env` and re-run; the app keeps working in demo mode meanwhile.
+- `Live AI credentials configured [FAIL]` — add your own `MODEL_API_KEY` to `.env` (never commit it) and re-run; the bootstrap changes nothing until the key is present.
 - Repeat runs are safe: healthy services are reused, seeding is idempotent, and no volumes are ever reset.
 
 ### One-time pedestrian graph bootstrap
