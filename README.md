@@ -97,60 +97,107 @@ flowchart TD
 
 ## Section 2 — Customer Journey: From Online Friendship to Real-World Connection
 
-Screenshots captured from the running application (simulated identities, genuine proximity math and routing).
+Screenshots captured from the running application (simulated identities, genuine proximity math, routing, and AI inference).
 
-### 01 — Discover
+### 01 — Discover Nearby Friends
 
 Open Near-Circle from the Messenger-style inbox and see who is actually nearby.
 
-![Messenger inbox with the Near-Circle entry point](docs/screenshots/messenger-inbox.png)
+![Messenger inbox with the Near-Circle entry point](docs/images/customer-journey/fin-1.jpg)
 
-*The inbox you already know, with a Near-Circle entry point and an opt-in visibility toggle. Conversations are simulated; proximity comes from the live API.*
+*The inbox you already know: existing conversations, a Near-Circle entry point, and an opt-in visibility toggle ("You appear on friends' radar"). Conversations are simulated; proximity comes from the live API.*
 
-### 02 — Explore
+### 02 — Explore the Nearby Friends Radar
 
 Adjust the discovery radius and watch the radar respond with real PostGIS distances.
 
-![Near-Circle radar showing two friends within 1 km](docs/screenshots/near-circle-radar.png)
+![Near-Circle radar showing four friends within 5 km](docs/images/customer-journey/fin-2.jpg)
 
-*Dots are placed by true distance and bearing around Metro Manila demo locations. More friends appear as the radius grows — Coleen at 500 m, Alex at 1 km, Sam at 2 km, Rhea at 5 km.*
+*Dots are placed by true distance and bearing around Metro Manila demo locations. The eligible set grows with the radius — Coleen at 500 m, Alex at 1 km, Sam at 2 km, Rhea at 5 km. The **Reconnect today** button carries the same radius into the candidate list.*
 
-### 03 — Reconnect
+### 03 — Reconnect Today
 
-Open Reconnect Today for the same eligible set as cards, or tap a dot for the friend view.
+Eligible nearby friends appear as reconnection candidates with stored closeness context.
 
-![Friend card showing proximity and consent state](docs/screenshots/friend-details.png)
+![Reconnect Today candidates with distance, closeness, and Ask Meta AI actions](docs/images/customer-journey/fin-3.jpg)
 
-*Each card shows verified proximity ("About 280 m away") and the consent boundary: precise destinations stay private without the applicable consent.*
+*Each card shows verified proximity ("About 280 m away · ~4 min on foot"), closeness tier and provenance ("Tier 5 (Demo profile)"), Snooze/Dismiss controls, and an explicit **Ask Meta AI** action. Candidacy applies the same backend rules as the radar — friendship, visibility, proximity, suppression — nothing is bypassed.*
 
-### 04 — Understand and Ask
+### 04 — Control AI Participation
 
-Review closeness context (tier, evidence, provenance), then optionally ask Meta AI.
+AI Circle settings keep every inference permission visible and reversible.
 
-*Circle Insight reads the stored profile without invoking the model. Only the explicit **Ask Meta AI** action calls Muse Spark 1.3 — which returns a grounded suggestion or an honest abstention, never a fabricated plan.*
+![AI Circle settings with consents, quiet hours, and model usage](docs/images/customer-journey/fin-4.jpg)
 
-### 05 — Connect
+*Analysis and meetup-suggestion consents, availability sharing, and quiet hours are separate toggles; **Model usage** discloses calls, cache hits, and tokens. Turning a consent off immediately stops new analysis and purges derived suggestions.*
 
-Walk the real route and meet.
+### 05 — Understand Friendship Context, Then Ask
 
-![Walking route on OpenStreetMap with distance, time, and steps](docs/screenshots/walking-route.png)
+Review the stored Circle Insight, then explicitly request assistance.
 
-*OSRM pedestrian geometry on OpenStreetMap: 342 m on foot versus 280 m straight line, with time and step estimates. Nothing is sent anywhere; the invitation draft stays editable on screen.*
+![Friend card with Circle Insight and the Ask Meta AI entry point](docs/images/customer-journey/fin-5.jpg)
+
+*The friend card confirms proximity and consent state; **Your Circle with Coleen** shows the persisted Inner Circle profile, connection trend, and how it was determined — all without invoking the model. Only the **Ask Meta AI** action ("Fancy catching up today?") triggers inference.*
+
+### 06 — Receive AI-Generated Meetup Advice
+
+The backend assembles eligible facts and Muse Spark 1.3 responds — with a suggestion or an honest abstention.
+
+![Live AI suggestion showing an honest insufficient-context outcome](docs/images/customer-journey/fin-6.jpg)
+
+*This genuine result shows the abstention path: "Not enough context", labeled **Live AI suggestion** with `Model: muse-spark-1.3`. No availability was provided, so no meeting is recommended and no activity is invented. **Ask again** and **View walking route** keep the next step with the user. When context suffices, the same panel presents the suggested activity, reasoning, and an editable invitation draft — never sent automatically.*
+
+### 07 — Walk the Route and Reconnect
+
+Plan the meetup over real pedestrian geometry; the decision stays with the users.
+
+![Walking route on OpenStreetMap with distance, time, and steps](docs/images/customer-journey/fin-7.jpg)
+
+*OSRM foot routing near Rizal Park: 342 m on foot versus 280 m straight line, 4 minutes, ~456 steps. The prototype assists with discovery, planning, and invitation preparation — it never verifies a meetup occurred and never contacts anyone on your behalf.*
 
 ```mermaid
-flowchart LR
+flowchart TD
     Open2["Open Near-Circle"]
     Radius["Select discovery radius"]
     Discover["Discover eligible friends"]
-    Reconnect["Open Reconnect Today"]
-    Review["Review friend context"]
-    Ask["Request Meta AI advice (optional)"]
-    Decide{"Meet up?"}
+    RecT["Open Reconnect Today"]
+    Review["Review friendship context"]
+    AskQ{"Ask Meta AI?"}
+    Advice["Receive advice or honest abstention"]
+    RouteQ{"Plan the walk?"}
+    RouteV["View walking route"]
+    Decide{"Reconnect?"}
 
-    Open2 --> Radius --> Discover --> Reconnect --> Review --> Ask --> Decide
+    Open2 --> Radius --> Discover --> RecT --> Review --> AskQ
+    AskQ -->|Yes| Advice --> RouteQ
+    AskQ -->|No| RouteQ
+    RouteQ -->|Yes| RouteV --> Decide
+    RouteQ -->|No| Decide
 ```
 
-*You stay in control: browsing never triggers inference, suggestions are low-pressure, and declining, snoozing, or dismissing a candidate is always one tap away.*
+*Requesting AI advice and pursuing a meetup are both optional. Browsing never triggers inference; declining, snoozing, or dismissing a candidate is always one tap away.*
+
+#### AI-assisted reconnection, step by step
+
+```mermaid
+flowchart TD
+    S1["1. User selects an eligible friend"]
+    S2["2. User reviews stored friendship context"]
+    S3["3. User taps Ask Meta AI"]
+    S4["4. Backend validates eligibility, preferences, consent"]
+    S5["5. Backend prepares factual context"]
+    S6["6. Muse Spark 1.3 generates structured advice"]
+    S7["7. Backend validates the model response"]
+    S8["8. User receives recommendation or unavailable outcome"]
+    S9["9. User reviews next steps and invitation draft"]
+    S10["10. User decides whether to pursue a meetup"]
+
+    S1 --> S2 --> S3 --> S4 --> S5 --> S6 --> S7 --> S8 --> S9 --> S10
+    S4 -.->|"ineligible / no consent"| S8
+    S7 -.->|"invalid response"| S8
+```
+
+*Branches converge on step 8: success, insufficient context, restriction, and service failure all render as their own honest states — inference is never faked.*
 
 ## Section 3 — What Is Near-Circle-Friend?
 
