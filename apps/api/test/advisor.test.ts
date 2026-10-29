@@ -65,6 +65,28 @@ const ALEX_SIGNALS = {
   signals_version: 1,
 };
 
+const COLEEN_NEARBY = { id: 'coleen', display_name: 'Coleen', distance_m: 280.1, bearing_deg: 45 };
+const COLEEN_DETAIL = {
+  id: 'coleen',
+  display_name: 'Coleen',
+  near_circle_enabled: true,
+  fresh: true,
+  distance_m: 280.1,
+  bearing_deg: 45,
+};
+const COLEEN_PROFILE = {
+  ...ALEX_PROFILE,
+  rationale: 'Friendly acquaintance open to catching up.',
+};
+const COLEEN_SIGNALS = {
+  ...ALEX_SIGNALS,
+  last_meetup_bucket: 'over_a_year_ago',
+  declared_closeness: 'friend',
+};
+// The judge scenario: the current user never shared availability, so the
+// model must NOT see a mutual-availability fact — only Coleen's demo context.
+const NO_AVAILABILITY = { ...CONSENTED, availability_shared: false };
+
 const STUB_ROUTING = {
   name: 'stub',
   async route() {
@@ -365,7 +387,7 @@ describe('demo availability wiring', () => {
     }
   });
 
-  it('adds fictional windows to live model input when the demo flag is on', async () => {
+  it('adds target-only demo context to live model input when the demo flag is on', async () => {
     const db = createAiFakeDb(liveSeeds());
     const provider = createCountingProvider();
     const app = await buildApp({
@@ -377,9 +399,60 @@ describe('demo availability wiring', () => {
       expect(res.status).toBe(200);
       expect(provider.calls.advise).toHaveLength(1);
       const demo = provider.calls.advise[0]?.opportunity.demo_availability;
-      expect(demo?.overlap_minutes).toBe(90);
       expect(demo?.target_interests).toContain('coffee');
-      expect(demo?.requester_window).toContain('Asia/Manila');
+      expect(demo?.target_window).toContain('Asia/Manila');
+      // Requester-side facts are never fabricated: no window, no interests,
+      // no computed overlap — so the model cannot claim mutual availability.
+      expect(demo?.requester_window).toBeNull();
+      expect(demo?.requester_interests).toEqual([]);
+      expect(demo?.overlap_minutes).toBeNull();
+      expect(demo?.usage_note).toMatch(/tentative/i);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('serves a tentative Coleen suggestion without a mutual-availability fact', async () => {
+    const db = createAiFakeDb({
+      relationships: { 'you:coleen': 'approved' },
+      nearby: [COLEEN_NEARBY],
+      detail: COLEEN_DETAIL,
+      signals: { 'you:coleen': COLEEN_SIGNALS },
+      profiles: { 'you:coleen': COLEEN_PROFILE },
+      prefs: { you: NO_AVAILABILITY, coleen: CONSENTED },
+    });
+    const provider = createCountingProvider({
+      advise: () => ({
+        opportunity: 'suggest',
+        opportunity_reason:
+          "Coleen is nearby and enjoys coffee and casual catch-ups; she's free later today, so a tentative coffee invite could suit — please confirm first.",
+        activity: 'coffee',
+        invitation_draft: 'Hey Coleen! Coffee later today? No pressure either way!',
+      }),
+    });
+    const app = await buildApp({
+      db,
+      ai: { provider, config: { ...CONFIG, demoAvailability: true } },
+    });
+    try {
+      const res = await json(app, 'POST', '/ai-circle/opportunities/coleen/advise', { radius_m: 500 });
+      expect(res.status).toBe(200);
+      expect(provider.calls.advise).toHaveLength(1);
+      const input = provider.calls.advise[0]?.opportunity;
+      // No mutual availability was ever shared: the model input says so.
+      expect(input?.availability_fact).toBeNull();
+      // Coleen's synthetic context reaches the model.
+      const demo = input?.demo_availability;
+      expect(demo?.target_interests).toEqual(['coffee', 'casual conversations', 'fitness', 'walking']);
+      expect(demo?.target_window).toContain('Asia/Manila');
+      expect(demo?.requester_window).toBeNull();
+      expect(demo?.overlap_minutes).toBeNull();
+      // The suggestion is served through and claims no mutual overlap.
+      expect(res.body['outcome']).toBe('suggest');
+      expect(res.body['source']).toBe('meta_live');
+      expect(res.body['model_id']).toBe('muse-spark-1.3');
+      const text = `${res.body['reason'] as string} ${res.body['invitation_draft'] as string}`;
+      expect(text).not.toMatch(/both (free|available|shared)/i);
     } finally {
       await app.close();
     }

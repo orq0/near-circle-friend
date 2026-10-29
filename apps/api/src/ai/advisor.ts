@@ -480,9 +480,9 @@ export async function requestAdvice(
     bothSharedAvailable: facts.bothSharedAvailable,
     walkMinutes: facts.walkMinutes,
     recentInviteDeclined: facts.recentInviteDeclined,
-    // Fictional demo windows for the judging roster only; null (omitted)
-    // everywhere else, so production prompts are byte-identical.
-    demoAvailability: getDemoAvailability(config.demoAvailability, ownerId, friendId, now),
+    // Synthetic target-side demo context for the judging roster only; null
+    // (omitted) everywhere else, so production prompts are byte-identical.
+    demoAvailability: getDemoAvailability(config.demoAvailability, friendId, now),
   });
   const result = await provider.adviseMeetup(input);
   // Post-inference recheck before releasing anything.
