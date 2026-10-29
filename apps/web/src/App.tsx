@@ -301,9 +301,11 @@ export function App() {
           ? 'This friend is not eligible for advice, or consent is missing.'
           : result.kind === 'suppressed'
             ? 'Suggestions are paused for this friend (snoozed or quiet hours).'
-            : result.kind === 'rate_limited'
-              ? 'AI budget reached for now — try again later.'
-              : 'Could not load meetup advice.';
+            : result.kind === 'pair_limited'
+              ? 'Already suggested for this friend recently — try again after the cooldown.'
+              : result.kind === 'rate_limited'
+                ? 'AI budget reached for now — try again later.'
+                : 'Could not load meetup advice.';
       setAdviceSlot(candidate.id, { state: 'error', advice: null, notice });
     },
     [radiusM, setAdviceSlot],

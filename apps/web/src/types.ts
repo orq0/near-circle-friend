@@ -122,6 +122,7 @@ export type AdviceFetch =
   | { kind: 'forbidden' }
   | { kind: 'suppressed' }
   | { kind: 'rate_limited' }
+  | { kind: 'pair_limited' }
   | { kind: 'unavailable' }
   | { kind: 'error' };
 

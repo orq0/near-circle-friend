@@ -130,8 +130,27 @@ export function createAiFakeDb(seed: AiFakeSeed = {}): Queryable & { state: Requ
         return { rows: [] as unknown as T[] };
       }
       if (text.startsWith('DELETE FROM ai_circle_meetup_advice')) {
+        // Demo-prep restore: Coleen-scoped delete first; owner-wide otherwise.
+        if (text.includes("friend_id = 'coleen'")) {
+          const before = state.advice.length;
+          state.advice = state.advice.filter((a) => !(a['owner_id'] === p(0) && a['friend_id'] === 'coleen'));
+          return { rows: Array.from({ length: before - state.advice.length }, () => ({ one: 1 })) as unknown as T[] };
+        }
         state.advice = state.advice.filter((a) => a['owner_id'] !== p(0));
         return { rows: [] as unknown as T[] };
+      }
+      if (text.startsWith('DELETE FROM ai_circle_feedback') && text.includes("friend_id = 'coleen'")) {
+        const before = state.feedback.length;
+        state.feedback = state.feedback.filter(
+          (f) =>
+            !(
+              f['owner_id'] === p(0) &&
+              f['friend_id'] === 'coleen' &&
+              (f['kind'] === 'dismiss' || f['kind'] === 'snooze') &&
+              (f['expires_at'] === null || (f['expires_at'] as Date).getTime() > state.now.getTime())
+            ),
+        );
+        return { rows: Array.from({ length: before - state.feedback.length }, () => ({ one: 1 })) as unknown as T[] };
       }
       if (text.startsWith('DELETE FROM ai_circle_closeness_overrides')) {
         delete state.overrides[pairKey(p(0), p(1))];

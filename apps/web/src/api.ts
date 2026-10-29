@@ -306,6 +306,23 @@ function isAdviceResult(value: unknown): value is AdviceResult {
 
 // Status-discriminating advice fetch: consent/eligibility (403), suppression
 // (409), budgets (429) and missing model access (503) each render honestly.
+/**
+ * A 429 for one specific friend (per-pair cooldown after a recent suggestion)
+ * is not budget exhaustion: the API says so in the error body, so surface it
+ * distinctly instead of blaming the AI budget.
+ */
+async function rateLimitKind(res: Response): Promise<'rate_limited' | 'pair_limited'> {
+  try {
+    const body = (await res.json()) as unknown;
+    if (isRecord(body) && typeof body['error'] === 'string' && body['error'].includes('for this friend')) {
+      return 'pair_limited';
+    }
+  } catch {
+    // Unreadable body: fall through to the generic budget message.
+  }
+  return 'rate_limited';
+}
+
 export async function requestAdvice(
   id: string,
   displayName: string,
@@ -323,7 +340,7 @@ export async function requestAdvice(
     });
     if (res.status === 403) return { kind: 'forbidden' };
     if (res.status === 409) return { kind: 'suppressed' };
-    if (res.status === 429) return { kind: 'rate_limited' };
+    if (res.status === 429) return { kind: await rateLimitKind(res) };
     if (res.status === 503) return { kind: 'unavailable' };
     if (!res.ok) return { kind: 'error' };
     const body = (await res.json()) as unknown;

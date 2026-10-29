@@ -527,3 +527,36 @@ export async function recordFeedback(
   );
   return { kind, expires_at: iso(rows[0]?.expires_at ?? null) };
 }
+
+/** The single friend the demo-prep restore may touch. Hardcoded by design. */
+export const COLEEN_DEMO_FRIEND_ID = 'coleen';
+
+/**
+ * Demo-prep restore for the Coleen judge scenario ONLY. Clears exactly the
+ * rows that currently exclude Coleen from Reconnect Today / fresh advice:
+ * dismiss + unexpired snooze feedback (mirroring isSuppressed) and the pair's
+ * advice rows (pair-window cooldown + stale cache). Never touches other
+ * friends, usage/budget counters, settings, friendships, or profiles.
+ * Idempotent: repeated calls clear zero rows once Coleen is restored.
+ */
+export async function restoreColeenDemo(
+  db: Queryable,
+  ownerId: string,
+): Promise<{ feedback_cleared: number; advice_cleared: number }> {
+  const feedback = await queryRows<{ one: number }>(
+    db,
+    `DELETE FROM ai_circle_feedback
+      WHERE owner_id = $1 AND friend_id = 'coleen' AND kind IN ('dismiss', 'snooze')
+        AND (expires_at IS NULL OR expires_at > NOW())
+      RETURNING 1 AS one`,
+    [ownerId],
+  );
+  const advice = await queryRows<{ one: number }>(
+    db,
+    `DELETE FROM ai_circle_meetup_advice
+      WHERE owner_id = $1 AND friend_id = 'coleen'
+      RETURNING 1 AS one`,
+    [ownerId],
+  );
+  return { feedback_cleared: feedback.length, advice_cleared: advice.length };
+}

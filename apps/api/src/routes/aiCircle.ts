@@ -18,7 +18,13 @@ import {
   type SignalEventType,
   type SettingsPatch,
 } from '../ai/aiCircle.js';
-import { getOpportunities, recordFeedback, requestAdvice } from '../ai/advisor.js';
+import {
+  COLEEN_DEMO_FRIEND_ID,
+  getOpportunities,
+  recordFeedback,
+  requestAdvice,
+  restoreColeenDemo,
+} from '../ai/advisor.js';
 import type { CircleModelProvider } from '../ai/metaModelProvider.js';
 import type { AiCircleConfig, ClosenessLevel } from '../ai/types.js';
 
@@ -186,5 +192,19 @@ export async function aiCircleRoutes(
       void processPendingJobs(db, provider, config).catch(() => undefined);
     }
     return result;
+  });
+
+  // Demo-prep restore for the Coleen judge scenario: clears Coleen's snooze /
+  // dismiss suppression plus her pair-window advice rows so Reconnect Today
+  // and fresh recommendations work again for repeated demo takes. Gated on
+  // the Coleen synthetic-context flag (not demoMode); 404 otherwise so
+  // production-like deployments have no such surface. Coleen-only by
+  // construction: the friend id is hardcoded, usage counters are untouched.
+  app.post('/ai-circle/demo/coleen-restore', async () => {
+    if (!config.demoAvailability || !config.enabled) {
+      throw new ApiError(404, 'not found');
+    }
+    const cleared = await restoreColeenDemo(db, DEMO_USER_ID);
+    return { restored: true, friend_id: COLEEN_DEMO_FRIEND_ID, ...cleared };
   });
 }
