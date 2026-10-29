@@ -14,6 +14,8 @@
     "start:judges": "node ./scripts/judges.mjs",
     "stop:judges-test": "node ./scripts/judges.mjs --stop-test",
     "test:judges": "node --test scripts/judges.test.mjs",
+    "test:scripts": "node --test scripts/judges.test.mjs scripts/reset-coleen.test.mjs",
+    "reset:coleen": "node ./scripts/reset-coleen.mjs",
     "dev:api": "npm --workspace apps/api run dev",
     "dev:web": "npm --workspace apps/web run dev",
     "db:seed": "npm --workspace apps/api run db:seed",
