@@ -1,0 +1,43 @@
+# Near-Circle isolated judge-test overlay — `npm run start:judges -- --test`.
+#
+# Purpose: run the full judge startup sequence without touching the development
+# environment. It MUST be combined with:
+#   - Compose project name `near-circle-judges-test` (`-p`, never the dev name),
+#   - test-only host ports passed through the environment
+#     (WEB_PORT=5273, API_PORT=3101, POSTGRES_PORT=5533),
+#   - the test-specific image tags below.
+#
+# Isolation hazards neutralized here (see docker-compose.yml for the base):
+#   - explicit `container_name` values would collide with running development
+#     containers regardless of project name, so every one is renamed;
+#   - built services get test-specific `image:` tags so a test build can never
+#     overwrite a development image tag;
+#   - the database volume is renamed so test seeding can never reach the
+#     development database files.
+# Deliberately NOT overridden (safe to share):
+#   - host port numbers: all are `${...}`-interpolated in the base file, so the
+#     environment alone selects the test ports;
+#   - service names and in-network hostnames (`near-circle-db`, `near-circle-api`),
+#     which resolve inside the per-project Compose network created by `-p`;
+#   - the read-only `./db/init` bind mount (schema source, never written);
+#   - pulled images (`postgis/postgis:16-3.4`): running an extra container from
+#     a shared image does not modify the image or any development container.
+# The optional `routing` profile is never enabled in test mode.
+
+services:
+  near-circle-web:
+    container_name: near-circle-judges-test-web
+    image: near-circle-web:judges-test
+
+  near-circle-api:
+    container_name: near-circle-judges-test-api
+    image: near-circle-api:judges-test
+
+  near-circle-db:
+    container_name: near-circle-judges-test-db
+    volumes:
+      - near-circle-judges-test-data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+
+volumes:
+  near-circle-judges-test-data:

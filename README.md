@@ -78,6 +78,23 @@ The script prints the actual URLs on success and opens the app in your browser (
 
 Short troubleshooting and the developer commands live in [Section 9 — Developer Guide](#section-9--developer-guide); the full judges reference (auto vs manual setup, AI/routing status meanings) is preserved there as well.
 
+### Isolated test mode (never touches development Docker resources)
+
+To exercise the full judge workflow without disturbing a running development stack:
+
+```powershell
+npm run start:judges -- --test
+```
+
+Test mode uses Compose project `near-circle-judges-test` with renamed containers, test-specific image tags (`:judges-test`), its own named volume, and separate host ports (app http://localhost:5273, API http://localhost:3101, PostgreSQL localhost:5533). Before creating anything it snapshots development container/image IDs, verifies the rendered Compose config contains no development names, reuses up-to-date test images (building only what is missing), and refuses to seed unless the connection target is the isolated database. It reports before/after evidence that development resources are unchanged. Your `.env` is read, never modified, and `MODEL_API_KEY` is never printed.
+
+Stop only the test environment (volumes preserved by default):
+
+```powershell
+npm run stop:judges-test
+npm run stop:judges-test -- --volumes   # also remove the isolated test volumes
+```
+
 ```mermaid
 flowchart TD
     Clone["Clone repository"]
@@ -373,6 +390,8 @@ npm run startall              # Compose stack with real readiness waits
 |---|---|
 | `npm run startall` | Start the Compose stack and wait for real readiness; enables the routing profile automatically once the graph exists |
 | `npm run start:judges` | Judge bootstrap: install, env, images, seed, and readiness in one command |
+| `npm run start:judges -- --test` | Isolated test run (separate project, containers, volume, ports) |
+| `npm run stop:judges-test` | Stop only the isolated test run (volumes preserved; add `-- --volumes` to remove them) |
 | `npm run status` | Read-only health of every service (never prints secrets) |
 | `npm run stopall` | Stop project services only; preserves data and graphs |
 | `npm run dev:api` | Native fallback: Fastify with reload on <http://localhost:3001> |
@@ -426,6 +445,7 @@ routing/           # OSRM boundary: README, data/ (graph artifacts), prepare-gra
 scripts/           # startall.ps1 / stopall.ps1 / status.ps1 (+ common.ps1), judges.mjs bootstrap
 docs/              # Specs and screenshots
 docker-compose.yml # Four project-owned services
+docker-compose.judges-test.yml # Isolated test-mode overlay (renamed containers/images/volume)
 ```
 
 ### Testing and verification

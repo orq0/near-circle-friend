@@ -169,6 +169,158 @@ export function coreReady({ db, api, web }) {
   return db === true && api === true && web === true;
 }
 
+// ---- Isolated judge-test mode (`--test`) -----------------------------------
+// The test run gets its own Compose project, container names, image tags,
+// named volume, and host ports. Nothing here may reference development names.
+
+export const TEST_PROJECT = 'near-circle-judges-test';
+export const TEST_COMPOSE_FILE = join(REPO_ROOT, 'docker-compose.judges-test.yml');
+export const TEST_PORTS = { web: 5273, api: 3101, db: 5533 };
+export const TEST_IMAGES = {
+  api: 'near-circle-api:judges-test',
+  web: 'near-circle-web:judges-test',
+};
+export const TEST_CONTAINERS = {
+  db: 'near-circle-judges-test-db',
+  api: 'near-circle-judges-test-api',
+  web: 'near-circle-judges-test-web',
+};
+export const TEST_VOLUME = 'near-circle-judges-test-data';
+export const TEST_BUILD_SOURCES = {
+  api: ['apps/api/Dockerfile', 'apps/api/package.json', 'apps/api/package-lock.json'],
+  web: ['apps/web/Dockerfile', 'apps/web/package.json', 'apps/web/package-lock.json'],
+};
+
+/** CLI parsing for the judges entry point. Unknown flags fail closed. */
+export function parseJudgesArgs(argv) {
+  const args = [...argv];
+  let mode = 'run';
+  let volumes = false;
+  for (const arg of args) {
+    if (arg === '--test') {
+      if (mode !== 'run') return { mode, volumes, error: 'conflicting mode flags' };
+      mode = 'test';
+    } else if (arg === '--stop-test') {
+      if (mode !== 'run') return { mode, volumes, error: 'conflicting mode flags' };
+      mode = 'stop-test';
+    } else if (arg === '--volumes') {
+      volumes = true;
+    } else {
+      return { mode, volumes, error: `unknown flag '${arg}' (supported: --test, --stop-test, --volumes)` };
+    }
+  }
+  if (volumes && mode !== 'stop-test') {
+    return { mode, volumes, error: '--volumes is only meaningful with --stop-test' };
+  }
+  return { mode, volumes };
+}
+
+/** `-p` + `-f` prefix shared by every test-mode compose invocation. */
+export function testComposePrefix() {
+  return ['-p', TEST_PROJECT, '-f', COMPOSE_FILE, '-f', TEST_COMPOSE_FILE];
+}
+
+export function buildTestUpArgs() {
+  return ['docker', 'compose', ...testComposePrefix(), 'up', '-d'];
+}
+
+export function buildTestBuildArgs(services) {
+  return ['docker', 'compose', ...testComposePrefix(), 'build', ...services];
+}
+
+export function buildTestDownArgs({ volumes }) {
+  const args = ['docker', 'compose', ...testComposePrefix(), 'down'];
+  if (volumes) args.push('--volumes');
+  return args;
+}
+
+/**
+ * Seed-target guard: the seeding connection must point at the isolated test
+ * database port, which itself must differ from the development port.
+ */
+export function seedTargetGuard({ seedPort, devPort, testPort }) {
+  if (!Number.isInteger(seedPort)) return { ok: false, reason: 'seed target port is not an integer' };
+  if (seedPort !== testPort) {
+    return { ok: false, reason: `seed target port ${seedPort} is not the isolated test port ${testPort}; refusing to seed` };
+  }
+  if (testPort === devPort) {
+    return { ok: false, reason: 'test port equals the development port; isolation impossible' };
+  }
+  return { ok: true, reason: '' };
+}
+
+/** Build the seeding connection string for the isolated database. */
+export function testSeedDatabaseUrl(env, testPort) {
+  const user = env.POSTGRES_USER ?? 'near_circle';
+  const password = env.POSTGRES_PASSWORD ?? 'near_circle_dev_password';
+  const db = env.POSTGRES_DB ?? 'near_circle';
+  return `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password)}@localhost:${testPort}/${db}`;
+}
+
+/** Reuse a test image only when it exists and is newer than its sources. */
+export function planImage({ exists, createdMs, sourceMtimesMs }) {
+  if (!exists) return { action: 'build', reason: 'test image tag absent' };
+  if (!Number.isFinite(createdMs)) return { action: 'build', reason: 'test image has no parseable creation time' };
+  const newestSource = Math.max(...sourceMtimesMs);
+  if (Number.isFinite(newestSource) && newestSource > createdMs) {
+    return { action: 'build', reason: 'a build source is newer than the test image' };
+  }
+  return { action: 'reuse', reason: 'test image present and up to date' };
+}
+
+/** Parse `docker ps --format {{.Names}}` output into container names. */
+export function parseContainerNames(text) {
+  return String(text).split('\n').map((l) => l.trim()).filter(Boolean);
+}
+
+/** Parse `docker compose ps --format json` (array or line-delimited). */
+export function parseComposePs(text) {
+  const trimmed = String(text).trim();
+  if (trimmed === '') return [];
+  return trimmed.startsWith('[') ? JSON.parse(trimmed) : trimmed.split('\n').filter(Boolean).map((l) => JSON.parse(l));
+}
+
+/**
+ * Name-collision check: a wanted test container name already taken on the
+ * host must be resolved (ours from a prior run) or fail the bootstrap.
+ */
+export function findNameCollisions(runningNames, wantedNames) {
+  const running = new Set(runningNames);
+  return wantedNames.filter((name) => running.has(name));
+}
+
+/**
+ * Verify rendered `compose config` output actually isolates the test stack:
+ * test names present, development container/volume names absent.
+ */
+export function renderedConfigGuards(configText) {
+  const problems = [];
+  const text = String(configText);
+  for (const name of Object.values(TEST_CONTAINERS)) {
+    if (!text.includes(name)) problems.push(`rendered config lacks test container ${name}`);
+  }
+  if (!text.includes(TEST_VOLUME)) problems.push('rendered config lacks the isolated test volume');
+  for (const tag of Object.values(TEST_IMAGES)) {
+    if (!text.includes(tag)) problems.push(`rendered config lacks test image tag ${tag}`);
+  }
+  const forbidden = [
+    'container_name: near-circle-db',
+    'container_name: near-circle-api',
+    'container_name: near-circle-web',
+    'near-circle-db-data:/',
+  ];
+  for (const marker of forbidden) {
+    if (text.includes(marker)) problems.push(`rendered config leaks development resource '${marker}'`);
+  }
+  return { ok: problems.length === 0, problems };
+}
+
+/** Extract a port number from a PostgreSQL connection string. */
+export function databaseUrlPort(url) {
+  const match = /:(\d+)(?:\/|$)/.exec(String(url).split('@').pop() ?? '');
+  return match ? Number(match[1]) : NaN;
+}
+
 /**
  * Mandatory credential gate: live AI recommendations require the operator's
  * own authorized key. Returns actionable setup guidance when absent. Only
@@ -291,6 +443,7 @@ function shellRun(cmd, args, opts = {}) {
     timeout: opts.timeoutMs ?? 300000,
     stdio: opts.inherit ? 'inherit' : 'pipe',
     shell: process.platform === 'win32',
+    env: opts.env ?? process.env,
   });
   return {
     code: res.status ?? 1,
@@ -303,12 +456,49 @@ function composePsRunning() {
   const res = run('docker', ['compose', '-f', COMPOSE_FILE, 'ps', '--format', 'json'], { timeoutMs: 30000 });
   if (res.code !== 0) return false;
   try {
-    const text = res.stdout.trim();
-    const list = text.startsWith('[') ? JSON.parse(text) : text.split('\n').filter(Boolean).map((l) => JSON.parse(l));
-    return list.some((c) => (c.State ?? c.state ?? '').toLowerCase() === 'running');
+    return parseComposePs(res.stdout).some((c) => (c.State ?? c.state ?? '').toLowerCase() === 'running');
   } catch {
     return false;
   }
+}
+
+/**
+ * Snapshot development container IDs (default runner is the real one; tests
+ * inject a mock). Used as before/after evidence that test mode left them
+ * untouched.
+ */
+export function collectDevContainerIds(runner = run) {
+  const res = runner('docker', ['compose', '-f', COMPOSE_FILE, 'ps', '-q'], { timeoutMs: 30000 });
+  if (res.code !== 0) return { ok: false, ids: [] };
+  return { ok: true, ids: parseContainerNames(res.stdout).sort() };
+}
+
+/** Snapshot image IDs for the given tags (absent tags record as null). */
+export function collectImageIds(runner, tags) {
+  const ids = {};
+  for (const tag of tags) {
+    const res = runner('docker', ['image', 'inspect', '--format', '{{.Id}}', tag], { timeoutMs: 30000 });
+    ids[tag] = res.code === 0 ? res.stdout.trim() : null;
+  }
+  return ids;
+}
+
+/** Creation timestamp (ms) of an image tag, or NaN when unavailable. */
+export function imageCreatedMs(runner, tag) {
+  const res = runner('docker', ['image', 'inspect', '--format', '{{.Created}}', tag], { timeoutMs: 30000 });
+  if (res.code !== 0) return NaN;
+  return Date.parse(res.stdout.trim());
+}
+
+/** mtime (ms) of repo-relative source files; missing files count as epoch 0. */
+export function sourceMtimesMs(files) {
+  return files.map((f) => {
+    try {
+      return statSync(join(REPO_ROOT, f)).mtimeMs;
+    } catch {
+      return 0;
+    }
+  });
 }
 
 function banner() {
@@ -320,64 +510,62 @@ function banner() {
   log('');
 }
 
-function dockerGuidance() {
+function dockerGuidance(rerunCmd = 'npm run start:judges') {
   log('');
   log('Docker is required for the Compose stack (PostgreSQL, API, frontend).');
   log('  1. Install Docker Desktop: https://www.docker.com/products/docker-desktop/');
   log('  2. Start Docker Desktop and wait until it reports "running".');
-  log('  3. Re-run: npm run start:judges');
+  log(`  3. Re-run: ${rerunCmd}`);
   log('');
   log('Native-development fallback (needs a reachable PostgreSQL instead):');
   log('  npm run dev:api    # Fastify API (uses DATABASE_URL or POSTGRES_* defaults)');
   log('  npm run dev:web    # Vite frontend');
 }
 
-async function main() {
-  banner();
+function testBanner() {
+  log('================================================');
+  log(' Near-Circle-Friend — Isolated Judge Test');
+  log(' (development Docker resources will not be touched)');
+  log('================================================');
+  log('');
+}
 
-  // ---- 1. Preflight: Node.js and npm ----
+// Shared preflight: identical for normal and test modes.
+async function preflightBasics(rerunCmd) {
   if (!nodeSatisfies(process.versions.node, 20)) {
     step(false, 'Node.js and npm detected', `node ${process.versions.node} does not satisfy engines >=20`);
-    log('Install Node.js 20+ from https://nodejs.org/, then re-run: npm run start:judges');
+    log(`Install Node.js 20+ from https://nodejs.org/, then re-run: ${rerunCmd}`);
     process.exitCode = 1;
-    return;
+    return false;
   }
   const npmVer = shellRun('npm', ['--version'], { timeoutMs: 30000 });
   if (npmVer.code !== 0) {
     step(false, 'Node.js and npm detected', 'npm is not on PATH');
     process.exitCode = 1;
-    return;
+    return false;
   }
   step(true, 'Node.js and npm detected', `node ${process.versions.node}, npm ${npmVer.stdout.trim()}`);
 
-  // ---- 2. Preflight: Docker Engine + Compose v2 ----
   const dockerInfo = run('docker', ['info'], { timeoutMs: 30000 });
   if (dockerInfo.code !== 0) {
     step(false, 'Docker Engine running', 'docker CLI missing or engine unreachable');
-    dockerGuidance();
+    dockerGuidance(rerunCmd);
     process.exitCode = 1;
-    return;
+    return false;
   }
   step(true, 'Docker Engine running');
   const composeVer = run('docker', ['compose', 'version', '--short'], { timeoutMs: 30000 });
   if (composeVer.code !== 0) {
     step(false, 'Docker Compose available', '"docker compose" v2 is unavailable; update Docker Desktop');
     process.exitCode = 1;
-    return;
+    return false;
   }
   step(true, 'Docker Compose available', composeVer.stdout.trim());
+  return true;
+}
 
-  // ---- 3. Tracked files ----
-  const missingFiles = REQUIRED_TRACKED_FILES.filter((f) => !existsSync(join(REPO_ROOT, f)));
-  if (missingFiles.length > 0) {
-    step(false, 'Repository files present', `missing: ${missingFiles.join(', ')}`);
-    log('Re-clone the repository, then re-run: npm run start:judges');
-    process.exitCode = 1;
-    return;
-  }
-  step(true, 'Repository files present');
-
-  // ---- 4. Environment (.env generated once, never overwritten) ----
+// Shared environment stage: .env generated once, never overwritten.
+function loadEnv() {
   let envCreated = false;
   if (!existsSync(ENV_FILE)) {
     copyFileSync(ENV_EXAMPLE, ENV_FILE);
@@ -391,17 +579,60 @@ async function main() {
   step(true, 'Environment configuration validated', envCreated ? '.env created from .env.example' : 'existing .env preserved');
   const ai = validateAiConfig(env);
   for (const problem of ai.problems) warn('AI configuration', problem.message);
+  return { env, envCreated, ai };
+}
 
-  // ---- 4b. Mandatory credential gate (fail fast, before any heavy work) ----
+// Shared deterministic install (skipped when already installed).
+function ensureDeps() {
+  const installed = existsSync(join(REPO_ROOT, 'node_modules', '.package-lock.json')) &&
+    existsSync(join(REPO_ROOT, 'node_modules', 'tsx')) &&
+    existsSync(join(REPO_ROOT, 'node_modules', 'pg'));
+  if (!installed) {
+    log('Installing dependencies (npm ci; first run only)...');
+    const ci = shellRun('npm', ['ci', '--no-audit', '--no-fund'], { inherit: true, timeoutMs: 600000 });
+    if (ci.code !== 0) {
+      step(false, 'Application dependencies installed', 'npm ci failed; see output above');
+      process.exitCode = 1;
+      return false;
+    }
+  }
+  step(true, 'Application dependencies installed', installed ? 'reused existing node_modules' : 'npm ci complete');
+  return true;
+}
+
+// Shared mandatory credential gate (fail fast, before any heavy work).
+function gateApiKey(env) {
   const credential = requireApiKey(env);
   if (!credential.ok) {
     step(false, 'Live AI credentials configured', 'MODEL_API_KEY is missing');
     for (const line of credential.guidance) log(`  ${line}`);
     log('No services were started or modified; no live-AI readiness is claimed.');
     process.exitCode = 1;
-    return;
+    return false;
   }
   step(true, 'Live AI credentials configured', 'key present (presence only; see summary)');
+  return true;
+}
+
+async function main() {
+  banner();
+
+  // ---- 1+2. Shared preflight ----
+  if (!(await preflightBasics('npm run start:judges'))) return;
+
+  // ---- 3. Tracked files ----
+  const missingFiles = REQUIRED_TRACKED_FILES.filter((f) => !existsSync(join(REPO_ROOT, f)));
+  if (missingFiles.length > 0) {
+    step(false, 'Repository files present', `missing: ${missingFiles.join(', ')}`);
+    log('Re-clone the repository, then re-run: npm run start:judges');
+    process.exitCode = 1;
+    return;
+  }
+  step(true, 'Repository files present');
+
+  // ---- 4+4b. Shared environment + credential gate ----
+  const { env, ai } = loadEnv();
+  if (!gateApiKey(env)) return;
 
   // ---- 5. Ports ----
   const ports = [
@@ -422,20 +653,8 @@ async function main() {
   }
   step(true, 'Required ports available');
 
-  // ---- 6. Dependencies (deterministic; skipped when already installed) ----
-  const installed = existsSync(join(REPO_ROOT, 'node_modules', '.package-lock.json')) &&
-    existsSync(join(REPO_ROOT, 'node_modules', 'tsx')) &&
-    existsSync(join(REPO_ROOT, 'node_modules', 'pg'));
-  if (!installed) {
-    log('Installing dependencies (npm ci; first run only)...');
-    const ci = shellRun('npm', ['ci', '--no-audit', '--no-fund'], { inherit: true, timeoutMs: 600000 });
-    if (ci.code !== 0) {
-      step(false, 'Application dependencies installed', 'npm ci failed; see output above');
-      process.exitCode = 1;
-      return;
-    }
-  }
-  step(true, 'Application dependencies installed', installed ? 'reused existing node_modules' : 'npm ci complete');
+  // ---- 6. Shared deterministic install ----
+  if (!ensureDeps()) return;
 
   // ---- 7. Docker images (existing Dockerfiles; pulls bases as needed) ----
   log('Preparing Docker images (docker compose build)...');
@@ -552,6 +771,260 @@ async function main() {
   openBrowser(webUrl);
 }
 
+// Development image tags watched as before/after evidence (test tags excluded:
+// building them during the run is the expected, isolated change).
+const TEST_EVIDENCE_IMAGES = [
+  'postgis/postgis:16-3.4',
+  'ghcr.io/project-osrm/osrm-backend:v5.27.1',
+  'near-circle-near-circle-api:latest',
+  'near-circle-near-circle-web:latest',
+];
+
+function testExecArgs(...rest) {
+  return ['compose', ...testComposePrefix(), ...rest];
+}
+
+async function mainTest() {
+  testBanner();
+  if (!(await preflightBasics('npm run start:judges -- --test'))) return;
+
+  const missingFiles = [...REQUIRED_TRACKED_FILES, 'docker-compose.judges-test.yml'].filter(
+    (f) => !existsSync(join(REPO_ROOT, f)),
+  );
+  if (missingFiles.length > 0) {
+    step(false, 'Repository files present', `missing: ${missingFiles.join(', ')}`);
+    process.exitCode = 1;
+    return;
+  }
+  step(true, 'Repository files present');
+
+  const { env, ai } = loadEnv();
+  if (!gateApiKey(env)) return;
+
+  const devPorts = {
+    web: Number(env.WEB_PORT) || 5173,
+    api: Number(env.API_PORT) || 3001,
+    db: Number(env.POSTGRES_PORT) || 5433,
+  };
+  for (const key of ['web', 'api', 'db']) {
+    if (TEST_PORTS[key] === devPorts[key]) {
+      step(false, 'Docker environment isolated', `test ${key} port ${TEST_PORTS[key]} equals the development port; refusing to proceed`);
+      process.exitCode = 1;
+      return;
+    }
+  }
+
+  // Evidence snapshots BEFORE touching Docker resources.
+  const devBefore = collectDevContainerIds();
+  const imagesBefore = collectImageIds(run, [...TEST_EVIDENCE_IMAGES, ...Object.values(TEST_IMAGES)]);
+  step(true, 'Docker environment isolated', `project ${TEST_PROJECT}; development state snapshotted`);
+
+  // Container-name collisions: only ours (prior test run) may be reused.
+  const namesRes = run('docker', ['ps', '-a', '--format', '{{.Names}}'], { timeoutMs: 30000 });
+  if (namesRes.code !== 0) {
+    step(false, 'Docker environment isolated', 'could not list containers; refusing to proceed');
+    process.exitCode = 1;
+    return;
+  }
+  const collisions = findNameCollisions(parseContainerNames(namesRes.stdout), Object.values(TEST_CONTAINERS));
+  for (const name of collisions) {
+    const insp = run('docker', ['inspect', '--format', '{{index .Config.Labels "com.docker.compose.project"}}', name], { timeoutMs: 30000 });
+    if (insp.code !== 0 || insp.stdout.trim() !== TEST_PROJECT) {
+      step(false, 'Docker environment isolated', `container name '${name}' belongs to another project; refusing to proceed`);
+      process.exitCode = 1;
+      return;
+    }
+  }
+  if (collisions.length > 0) log(`Reusing ${collisions.length} container(s) from a previous isolated run.`);
+
+  // Test ports must be free (never steal them).
+  for (const [label, port] of [['Web', TEST_PORTS.web], ['API', TEST_PORTS.api], ['PostgreSQL', TEST_PORTS.db]]) {
+    if (await tcpOpen('localhost', port)) {
+      step(false, `${label} test port ${port} available`, 'occupied; stop that process and re-run');
+      process.exitCode = 1;
+      return;
+    }
+  }
+  step(true, 'Required test ports available', '5273/3101/5533 free and distinct from development');
+
+  // Rendered-config guard: prove the overlay isolates before creating anything.
+  const cfg = run('docker', testExecArgs('config'), { timeoutMs: 60000 });
+  if (cfg.code !== 0) {
+    step(false, 'Docker environment isolated', 'compose config failed; see output above');
+    log(cfg.stderr);
+    process.exitCode = 1;
+    return;
+  }
+  const guards = renderedConfigGuards(cfg.stdout);
+  if (!guards.ok) {
+    step(false, 'Docker environment isolated', 'rendered test config is not isolated');
+    for (const problem of guards.problems) log(`  - ${problem}`);
+    process.exitCode = 1;
+    return;
+  }
+  step(true, 'Existing development containers untouched', 'rendered config verified; nothing created yet');
+
+  if (!ensureDeps()) return;
+
+  // Images: reuse compatible test tags, build only what is missing or stale.
+  // Development tags are never built, retagged, or removed here.
+  const toBuild = [];
+  for (const svc of ['api', 'web']) {
+    const tag = TEST_IMAGES[svc];
+    const probe = run('docker', ['image', 'inspect', '--format', '{{.Id}}', tag], { timeoutMs: 30000 });
+    const plan = planImage({
+      exists: probe.code === 0,
+      createdMs: probe.code === 0 ? imageCreatedMs(run, tag) : NaN,
+      sourceMtimesMs: sourceMtimesMs(TEST_BUILD_SOURCES[svc]),
+    });
+    log(`${plan.action === 'reuse' ? '[OK]' : '[..]'} Test image ${tag} — ${plan.reason}`);
+    if (plan.action === 'build') toBuild.push(svc);
+  }
+  if (toBuild.length > 0) {
+    log(`Building isolated test images for: ${toBuild.join(', ')}...`);
+    const build = shellRun('docker', testExecArgs('build', ...toBuild).slice(1), { inherit: true, timeoutMs: 600000 });
+    if (build.code !== 0) {
+      step(false, 'Existing Docker images preserved', 'isolated test build failed; development tags untouched');
+      process.exitCode = 1;
+      return;
+    }
+  }
+  step(true, 'Existing Docker images preserved', 'only test-specific tags built; nothing removed or retagged');
+
+  // Start the isolated stack (routing profile is never enabled in test mode).
+  log('Starting isolated services (test project only)...');
+  const up = shellRun('docker', testExecArgs('up', '-d').slice(1), { inherit: true, timeoutMs: 300000 });
+  if (up.code !== 0) {
+    step(false, 'Isolated services started', 'compose up failed; see output above');
+    process.exitCode = 1;
+    return;
+  }
+
+  // Database readiness inside the isolated network.
+  const pgUser = env.POSTGRES_USER ?? 'near_circle';
+  const pgDb = env.POSTGRES_DB ?? 'near_circle';
+  const dbReady = await waitFor(async () => {
+    const probe = run('docker', testExecArgs('exec', '-T', 'near-circle-db', 'pg_isready', '-U', pgUser, '-d', pgDb), { timeoutMs: 15000 });
+    return probe.code === 0;
+  }, { timeoutMs: READINESS_TIMEOUTS_MS.db });
+  if (!dbReady) {
+    step(false, 'Database created in isolated volume', 'pg_isready never succeeded (90s)');
+    process.exitCode = 1;
+    return;
+  }
+  step(true, 'Database created in isolated volume', `named volume ${TEST_VOLUME}`);
+
+  // Seeding with a verified isolated target (never the development database).
+  const seedUrl = testSeedDatabaseUrl(env, TEST_PORTS.db);
+  const guard = seedTargetGuard({ seedPort: databaseUrlPort(seedUrl), devPort: devPorts.db, testPort: TEST_PORTS.db });
+  if (!guard.ok) {
+    step(false, 'Demo users seeded', guard.reason);
+    process.exitCode = 1;
+    return;
+  }
+  log('Seeding isolated demo data (idempotent; safe to re-run)...');
+  const seed = shellRun('npm', ['run', 'db:seed'], {
+    inherit: true,
+    timeoutMs: 300000,
+    env: { ...process.env, DATABASE_URL: seedUrl },
+  });
+  if (seed.code !== 0) {
+    step(false, 'Demo users seeded', 'npm run db:seed failed; see output above');
+    process.exitCode = 1;
+    return;
+  }
+  step(true, 'Demo users seeded', `isolated database on port ${TEST_PORTS.db}`);
+
+  // API readiness + Coleen probe through the isolated API.
+  const apiHealth = `http://localhost:${TEST_PORTS.api}/health`;
+  const apiReady = await waitFor(async () => (await httpGetJson(apiHealth, 3000)).ok, {
+    timeoutMs: READINESS_TIMEOUTS_MS.api,
+  });
+  if (!apiReady) {
+    step(false, 'API healthy', `no response at ${apiHealth} (90s)`);
+    process.exitCode = 1;
+    return;
+  }
+  step(true, 'API healthy', apiHealth);
+  const seedProbe = await httpGetJson(`http://localhost:${TEST_PORTS.api}/friends/nearby?radius_m=500`, 8000);
+  const seedCheck = seedProbe.ok ? checkSeedNearby(seedProbe.body) : { ok: false, reason: 'seed probe unreachable' };
+  if (!seedCheck.ok) {
+    step(false, 'Coleen discoverable at 500 m', seedCheck.reason);
+    process.exitCode = 1;
+    return;
+  }
+  step(true, 'Coleen discoverable at 500 m');
+
+  // Frontend readiness.
+  const webUrl = `http://localhost:${TEST_PORTS.web}/`;
+  const webReady = await waitFor(async () => (await httpGetJson(webUrl, 3000)).ok, {
+    timeoutMs: READINESS_TIMEOUTS_MS.web,
+  });
+  if (!webReady) {
+    step(false, 'Frontend ready', `no response at ${webUrl} (120s)`);
+    process.exitCode = 1;
+    return;
+  }
+  step(true, 'Frontend ready', webUrl);
+
+  // Before/after evidence: development must be byte-identical.
+  const devAfter = collectDevContainerIds();
+  const imagesAfter = collectImageIds(run, [...TEST_EVIDENCE_IMAGES, ...Object.values(TEST_IMAGES)]);
+  const devUnchanged = devBefore.ok && devAfter.ok &&
+    JSON.stringify(devBefore.ids) === JSON.stringify(devAfter.ids);
+  const imagesUnchanged = TEST_EVIDENCE_IMAGES.every((t) => (imagesBefore[t] ?? null) === (imagesAfter[t] ?? null));
+  step(devUnchanged, 'Existing development containers untouched', devUnchanged ? 'container IDs identical' : 'container set changed!');
+  step(imagesUnchanged, 'Existing Docker images preserved', imagesUnchanged ? 'watched image IDs identical' : 'a watched image changed!');
+  if (!coreReady({ db: dbReady, api: apiReady, web: webReady }) || !devUnchanged || !imagesUnchanged) {
+    process.exitCode = 1;
+    return;
+  }
+  step(true, 'Judge bootstrap verified');
+
+  log('');
+  log('================================================');
+  log(' Near-Circle-Friend — Isolated Judge Test ready!');
+  log('================================================');
+  log(`AI Provider: Meta Muse Spark 1.3 (${ai.model || 'muse-spark-1.3'})`);
+  log('AI Status: Configured (key present; authentication is proven only by a');
+  log('  real inference call, e.g. Ask Meta AI in the app — never by this check)');
+  log('Routing: Not enabled in test mode (core app only)');
+  log('');
+  log(`Test application: ${webUrl}`);
+  log(`Test API health: ${apiHealth}`);
+  log('');
+  log('Demo: Open Radar → Select 500 m → Reconnect Today');
+  log('Stop only this test environment: npm run stop:judges-test');
+  log('================================================');
+  log('');
+  log('Test environment ready.');
+  openBrowser(webUrl);
+}
+
+async function mainStopTest({ volumes }) {
+  const dockerInfo = run('docker', ['info'], { timeoutMs: 30000 });
+  if (dockerInfo.code !== 0) {
+    log('Docker is not available, so no isolated test containers can be running. Nothing to stop.');
+    process.exitCode = 0;
+    return;
+  }
+  log('Stopping the isolated judge test environment...');
+  log(`(development project is never addressed; volumes ${volumes ? 'explicitly removed' : 'preserved'})`);
+  const down = shellRun('docker', buildTestDownArgs({ volumes }).slice(1), { inherit: true, timeoutMs: 120000 });
+  if (down.code !== 0) {
+    const empty = /no such|not found|no containers/i.test(`${down.stdout}\n${down.stderr}`);
+    if (empty) {
+      log('No isolated test containers exist; nothing to stop.');
+      process.exitCode = 0;
+      return;
+    }
+    step(false, 'Isolated test environment stopped', 'compose down failed; see output above');
+    process.exitCode = 1;
+    return;
+  }
+  step(true, 'Isolated test environment stopped', volumes ? 'test volumes removed on request' : 'test volumes preserved');
+}
+
 const invokedAsScript = (() => {
   try {
     return resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url);
@@ -561,8 +1034,24 @@ const invokedAsScript = (() => {
 })();
 
 if (invokedAsScript) {
-  main().catch((err) => {
+  const cli = parseJudgesArgs(process.argv.slice(2));
+  const onError = (err) => {
     log(`[FAIL] Unexpected error: ${err instanceof Error ? err.message : String(err)}`);
     process.exitCode = 1;
-  });
+  };
+  if (cli.error) {
+    log(`[FAIL] ${cli.error}`);
+    log('Usage: node ./scripts/judges.mjs [--test] [--stop-test [--volumes]]');
+    log('  (no flags)            normal judge bootstrap (development project)');
+    log('  --test                isolated run (project near-circle-judges-test)');
+    log('  --stop-test           stop only the isolated run (volumes preserved)');
+    log('  --stop-test --volumes also remove the isolated test volumes');
+    process.exitCode = 1;
+  } else if (cli.mode === 'test') {
+    mainTest().catch(onError);
+  } else if (cli.mode === 'stop-test') {
+    mainStopTest(cli).catch(onError);
+  } else {
+    main().catch(onError);
+  }
 }

@@ -12,6 +12,7 @@
     "stopall": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/stopall.ps1",
     "status": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/status.ps1",
     "start:judges": "node ./scripts/judges.mjs",
+    "stop:judges-test": "node ./scripts/judges.mjs --stop-test",
     "test:judges": "node --test scripts/judges.test.mjs",
     "dev:api": "npm --workspace apps/api run dev",
     "dev:web": "npm --workspace apps/web run dev",
