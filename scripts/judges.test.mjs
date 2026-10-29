@@ -15,8 +15,10 @@ import {
   classifyPort,
   collectDevContainerIds,
   collectImageIds,
+  compareDevEvidence,
   coreReady,
   databaseUrlPort,
+  dockerInvocation,
   findNameCollisions,
   mergeEnv,
   nodeSatisfies,
@@ -29,10 +31,12 @@ import {
   requireApiKey,
   routingReadiness,
   seedTargetGuard,
+  snapshotDevEvidence,
   testComposePrefix,
   testSeedDatabaseUrl,
   validateAiConfig,
   TEST_CONTAINERS,
+  TEST_EVIDENCE_IMAGES,
   TEST_IMAGES,
   TEST_PORTS,
   TEST_PROJECT,
@@ -278,6 +282,54 @@ describe('judge bootstrap logic', () => {
     assert.equal(failing.ok, false);
     const images = collectImageIds(mock, ['present:tag', 'missing:tag']);
     assert.deepEqual(images, { 'present:tag': 'sha256:abc', 'missing:tag': null });
+  });
+
+  it('invokes Docker as `docker compose ...`, never `docker` with compose flags', () => {
+    // Regression test for the isolated-build failure: call sites once stripped
+    // the `compose` subcommand with .slice(1), producing `docker -p/-f ...`,
+    // which the CLI rejects with a usage error before anything is built.
+    assert.deepEqual(dockerInvocation(['docker', 'compose', 'up']), { cmd: 'docker', args: ['compose', 'up'] });
+    const mutationArgvs = [
+      ['docker', ...buildUpArgs({ composeFile: 'docker-compose.yml', routingReady: false })],
+      ['docker', ...buildUpArgs({ composeFile: 'docker-compose.yml', routingReady: true })],
+      ['docker', 'compose', ...testComposePrefix(), 'build', 'api'],
+      ['docker', 'compose', ...testComposePrefix(), 'up', '-d'],
+      ['docker', 'compose', ...testComposePrefix(), 'exec', '-T', 'near-circle-db', 'pg_isready'],
+      buildTestUpArgs(),
+      buildTestBuildArgs(['api', 'web']),
+      buildTestDownArgs({ volumes: false }),
+      buildTestDownArgs({ volumes: true }),
+    ];
+    for (const argv of mutationArgvs) {
+      const { cmd, args } = dockerInvocation(argv);
+      assert.equal(cmd, 'docker');
+      assert.equal(args[0], 'compose', `first token must be the compose subcommand: ${JSON.stringify(argv)}`);
+      assert.ok(!['-p', '-f', 'up', 'down', 'build', 'exec', 'config'].includes(args[0]));
+    }
+    // The bug pattern itself must not reappear anywhere in the entry point.
+    assert.ok(!JUDGES_SRC.includes('.slice(1)'), 'no .slice(1) argv mangling may remain');
+  });
+
+  it('compares development evidence snapshots through a mock runner', () => {
+    const stable = (cmd, args) => {
+      const joined = [cmd, ...args].join(' ');
+      if (joined.includes('ps -q')) return { code: 0, stdout: 'aaa\n', stderr: '' };
+      if (joined.includes('image inspect')) return { code: 0, stdout: 'sha256:same\n', stderr: '' };
+      throw new Error(`unexpected call: ${joined}`);
+    };
+    const before = snapshotDevEvidence(stable);
+    assert.deepEqual(compareDevEvidence(before, stable), { devUnchanged: true, imagesUnchanged: true });
+    const drifted = (cmd, args) => {
+      const joined = [cmd, ...args].join(' ');
+      if (joined.includes('ps -q')) return { code: 0, stdout: 'aaa\nzzz\n', stderr: '' };
+      if (joined.includes('image inspect')) return { code: 0, stdout: 'sha256:same\n', stderr: '' };
+      throw new Error(`unexpected call: ${joined}`);
+    };
+    assert.equal(compareDevEvidence(before, drifted).devUnchanged, false);
+    const vanished = () => ({ code: 1, stdout: '', stderr: 'boom' });
+    const failed = compareDevEvidence(before, vanished);
+    assert.equal(failed.devUnchanged, false);
+    assert.equal(failed.imagesUnchanged, false);
   });
 
   it('keeps destructive operations out of every mode', () => {

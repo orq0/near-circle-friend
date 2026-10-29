@@ -322,6 +322,36 @@ export function databaseUrlPort(url) {
 }
 
 /**
+ * Split a complete argv (executable first) into spawn parts. Centralizes the
+ * one correct way to invoke Docker: `docker compose ...` — never `docker`
+ * with compose flags, which the CLI rejects with a usage error.
+ */
+export function dockerInvocation(argv) {
+  const [cmd, ...args] = [...argv];
+  return { cmd, args };
+}
+
+/** Development evidence snapshot (injectable runner for tests). */
+export function snapshotDevEvidence(runner = run) {
+  return {
+    dev: collectDevContainerIds(runner),
+    images: collectImageIds(runner, TEST_EVIDENCE_IMAGES),
+  };
+}
+
+/** Compare a snapshot against the current state (injectable runner). */
+export function compareDevEvidence(before, runner = run) {
+  const devAfter = collectDevContainerIds(runner);
+  const imagesAfter = collectImageIds(runner, TEST_EVIDENCE_IMAGES);
+  const devUnchanged = before.dev.ok && devAfter.ok &&
+    JSON.stringify(before.dev.ids) === JSON.stringify(devAfter.ids);
+  const imagesUnchanged = TEST_EVIDENCE_IMAGES.every(
+    (t) => (before.images[t] ?? null) === (imagesAfter[t] ?? null),
+  );
+  return { devUnchanged, imagesUnchanged };
+}
+
+/**
  * Mandatory credential gate: live AI recommendations require the operator's
  * own authorized key. Returns actionable setup guidance when absent. Only
  * presence is checked here — never the value, which is never printed.
@@ -434,6 +464,11 @@ export function openBrowser(url) {
   } catch {
     return false;
   }
+}
+
+function shellDocker(argv, opts = {}) {
+  const { cmd, args } = dockerInvocation(argv);
+  return shellRun(cmd, args, opts);
 }
 
 function shellRun(cmd, args, opts = {}) {
@@ -681,12 +716,11 @@ async function main() {
 
   // ---- 9. Start services (existing Compose architecture; no volume flags) ----
   log('Starting services (docker compose up -d)...');
-  const up = shellRun('docker', buildUpArgs({ composeFile: COMPOSE_FILE, routingReady: graph.ready }).slice(1), {
-    inherit: true,
-    timeoutMs: 300000,
-  });
+  const upArgv = ['docker', ...buildUpArgs({ composeFile: COMPOSE_FILE, routingReady: graph.ready })];
+  const up = shellDocker(upArgv, { inherit: true, timeoutMs: 300000 });
   if (up.code !== 0) {
     step(false, 'Services started', 'compose up failed; see output above');
+    log(`  command: ${upArgv.join(' ')} (exit ${up.code})`);
     process.exitCode = 1;
     return;
   }
@@ -773,7 +807,7 @@ async function main() {
 
 // Development image tags watched as before/after evidence (test tags excluded:
 // building them during the run is the expected, isolated change).
-const TEST_EVIDENCE_IMAGES = [
+export const TEST_EVIDENCE_IMAGES = [
   'postgis/postgis:16-3.4',
   'ghcr.io/project-osrm/osrm-backend:v5.27.1',
   'near-circle-near-circle-api:latest',
@@ -815,8 +849,7 @@ async function mainTest() {
   }
 
   // Evidence snapshots BEFORE touching Docker resources.
-  const devBefore = collectDevContainerIds();
-  const imagesBefore = collectImageIds(run, [...TEST_EVIDENCE_IMAGES, ...Object.values(TEST_IMAGES)]);
+  const evidenceBefore = snapshotDevEvidence();
   step(true, 'Docker environment isolated', `project ${TEST_PROJECT}; development state snapshotted`);
 
   // Container-name collisions: only ours (prior test run) may be reused.
@@ -882,9 +915,13 @@ async function mainTest() {
   }
   if (toBuild.length > 0) {
     log(`Building isolated test images for: ${toBuild.join(', ')}...`);
-    const build = shellRun('docker', testExecArgs('build', ...toBuild).slice(1), { inherit: true, timeoutMs: 600000 });
+    const buildArgv = ['docker', ...testExecArgs('build', ...toBuild)];
+    const build = shellDocker(buildArgv, { inherit: true, timeoutMs: 600000 });
     if (build.code !== 0) {
-      step(false, 'Existing Docker images preserved', 'isolated test build failed; development tags untouched');
+      const after = compareDevEvidence(evidenceBefore);
+      step(false, 'Existing Docker images preserved', 'isolated test build failed');
+      log(`  command: ${buildArgv.join(' ')} (exit ${build.code})`);
+      log(`  development containers unchanged: ${after.devUnchanged}; development images unchanged: ${after.imagesUnchanged}`);
       process.exitCode = 1;
       return;
     }
@@ -893,9 +930,13 @@ async function mainTest() {
 
   // Start the isolated stack (routing profile is never enabled in test mode).
   log('Starting isolated services (test project only)...');
-  const up = shellRun('docker', testExecArgs('up', '-d').slice(1), { inherit: true, timeoutMs: 300000 });
+  const testUpArgv = ['docker', ...testExecArgs('up', '-d')];
+  const up = shellDocker(testUpArgv, { inherit: true, timeoutMs: 300000 });
   if (up.code !== 0) {
+    const after = compareDevEvidence(evidenceBefore);
     step(false, 'Isolated services started', 'compose up failed; see output above');
+    log(`  command: ${testUpArgv.join(' ')} (exit ${up.code})`);
+    log(`  development containers unchanged: ${after.devUnchanged}; development images unchanged: ${after.imagesUnchanged}`);
     process.exitCode = 1;
     return;
   }
@@ -968,11 +1009,7 @@ async function mainTest() {
   step(true, 'Frontend ready', webUrl);
 
   // Before/after evidence: development must be byte-identical.
-  const devAfter = collectDevContainerIds();
-  const imagesAfter = collectImageIds(run, [...TEST_EVIDENCE_IMAGES, ...Object.values(TEST_IMAGES)]);
-  const devUnchanged = devBefore.ok && devAfter.ok &&
-    JSON.stringify(devBefore.ids) === JSON.stringify(devAfter.ids);
-  const imagesUnchanged = TEST_EVIDENCE_IMAGES.every((t) => (imagesBefore[t] ?? null) === (imagesAfter[t] ?? null));
+  const { devUnchanged, imagesUnchanged } = compareDevEvidence(evidenceBefore);
   step(devUnchanged, 'Existing development containers untouched', devUnchanged ? 'container IDs identical' : 'container set changed!');
   step(imagesUnchanged, 'Existing Docker images preserved', imagesUnchanged ? 'watched image IDs identical' : 'a watched image changed!');
   if (!coreReady({ db: dbReady, api: apiReady, web: webReady }) || !devUnchanged || !imagesUnchanged) {
@@ -1010,7 +1047,8 @@ async function mainStopTest({ volumes }) {
   }
   log('Stopping the isolated judge test environment...');
   log(`(development project is never addressed; volumes ${volumes ? 'explicitly removed' : 'preserved'})`);
-  const down = shellRun('docker', buildTestDownArgs({ volumes }).slice(1), { inherit: true, timeoutMs: 120000 });
+  const downArgv = buildTestDownArgs({ volumes });
+  const down = shellDocker(downArgv, { inherit: true, timeoutMs: 120000 });
   if (down.code !== 0) {
     const empty = /no such|not found|no containers/i.test(`${down.stdout}\n${down.stderr}`);
     if (empty) {
@@ -1019,6 +1057,7 @@ async function mainStopTest({ volumes }) {
       return;
     }
     step(false, 'Isolated test environment stopped', 'compose down failed; see output above');
+    log(`  command: ${downArgv.join(' ')} (exit ${down.code})`);
     process.exitCode = 1;
     return;
   }
