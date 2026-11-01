@@ -73,8 +73,9 @@ The script prints the actual URLs on success and opens the app in your browser (
 4. Open Reconnect Today — Coleen appears at all four distances.
 5. Explore Rhea's card at 5 km.
 6. Examine a friend profile: closeness tier, evidence, and provenance labels.
-7. Trigger Ask Meta AI for genuine Muse Spark 1.3 meetup advice (requires your `MODEL_API_KEY`).
-8. Open a walking route to see real OSRM pedestrian geometry (requires the one-time graph bootstrap below).
+7. In AI Circle settings, enable both the analysis and meetup-suggestion consents (both default off; advice is refused without them).
+8. Trigger Ask Meta AI for genuine Muse Spark 1.3 meetup advice (requires your `MODEL_API_KEY`).
+9. Open a walking route to see real OSRM pedestrian geometry (requires the one-time graph bootstrap below).
 
 Short troubleshooting and the developer commands live in [Section 9 — Developer Guide](#section-9--developer-guide); the full judges reference (auto vs manual setup, AI/routing status meanings) is preserved there as well.
 
@@ -86,7 +87,7 @@ To exercise the full judge workflow without disturbing a running development sta
 npm run start:judges -- --test
 ```
 
-Test mode uses Compose project `near-circle-judges-test` with renamed containers, test-specific image tags (`:judges-test`), its own named volume, and separate host ports (app http://localhost:5273, API http://localhost:3101, PostgreSQL localhost:5533). Before creating anything it snapshots development container/image IDs, verifies the rendered Compose config contains no development names, reuses up-to-date test images (building only what is missing), and refuses to seed unless the connection target is the isolated database. It reports before/after evidence that development resources are unchanged. Your `.env` is read, never modified, and `MODEL_API_KEY` is never printed.
+Test mode uses Compose project `near-circle-judges-test` with renamed containers, test-specific image tags (`:judges-test`), its own named volume, and separate host ports (app http://localhost:5273, API http://localhost:3101, PostgreSQL localhost:5533). Before creating anything it snapshots development container/image IDs, verifies the rendered Compose config contains no development names, reuses up-to-date test images (building only what is missing), and refuses to seed unless the connection target is the isolated database. It reports before/after evidence that development resources are unchanged. Pedestrian routing is excluded from test mode. Your `.env` is created from `.env.example` when missing and never overwritten, and `MODEL_API_KEY` is never printed.
 
 Stop only the test environment (volumes preserved by default):
 
@@ -394,6 +395,7 @@ npm run startall              # Compose stack with real readiness waits
 | `npm run stop:judges-test` | Stop only the isolated test run (volumes preserved; add `-- --volumes` to remove them) |
 | `npm run status` | Read-only health of every service (never prints secrets) |
 | `npm run stopall` | Stop project services only; preserves data and graphs |
+| `npm run reset:coleen` | Restore Coleen after snooze/dismiss and clear her advice cooldown (Coleen-only; usage counters untouched) |
 | `npm run dev:api` | Native fallback: Fastify with reload on <http://localhost:3001> |
 | `npm run dev:web` | Native fallback: Vite with HMR on <http://localhost:5173> |
 
@@ -467,7 +469,7 @@ See [`.env.example`](./.env.example) for configurable ports, credentials, routin
 
 ### Demo fixtures
 
-The seed adds Jamie (frequent recent contact, beyond 5 km so existing discovery expectations are unchanged) and Taylor (discovery opt-out), plus Alex's persisted Level-4 demo profile and Sam's sparse "not enough information" profile. Enable the two consents in **AI Circle settings**, open **Reconnect today**, and judge the abstain/suggest flows end to end keyless.
+The seed adds Jamie (frequent recent contact, beyond 5 km so existing discovery expectations are unchanged) and Taylor (discovery opt-out), plus Alex's persisted Level-4 demo profile and Sam's sparse "not enough information" profile. Enable the two consents in **AI Circle settings**, open **Reconnect today**, and judge the abstain/suggest flows end to end (keyless native flow only — `start:judges` always requires a key).
 
 ### Known limitations
 
@@ -477,7 +479,7 @@ The seed adds Jamie (frequent recent contact, beyond 5 km so existing discovery 
 - Step counts are estimates from walking distance and a configurable stride (default 0.75 m), not measured steps.
 - Map tiles come from an external OSM-compatible provider, not from a local container.
 - Location freshness is demo-driven (30-day window); consent checks are enforced in the API but there is no real account system behind them.
-- AI assessments and advice bill against your Meta Model API key and rate limits; without a key the feature serves stored fixtures and deterministic labeled demo advice. AI outputs are suggestions grounded in disclosed facts, not measured truth — manual tiers always win.
+- AI assessments and advice bill against your Meta Model API key and rate limits; in the native development flow without a key, the feature serves stored fixtures and deterministic labeled demo advice. AI outputs are suggestions grounded in disclosed facts, not measured truth — manual tiers always win.
 
 ### Troubleshooting
 
